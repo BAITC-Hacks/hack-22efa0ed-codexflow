@@ -158,7 +158,7 @@ def _missing_reply(state: dict[str, Any]) -> str:
     missing = [field for field in REQUIRED if state.get(field) is None]
     if missing == ["category", "budget_kzt"]:
         return prefix + (
-            "Кого подбираем — например, ведущего, фотографа или флориста — и какой бюджет в ₸? "
+            "Какую категорию подрядчика ищем — например, ведущего, фотографа или флориста — и какой бюджет в ₸? "
             "После этого покажу до трёх подходящих вариантов."
         )
     labels = {"city": "город", "event_date": "дату", "event_format": "формат события",
@@ -187,8 +187,11 @@ def assistant_turn(providers: Iterable[Provider], message: str,
         "duration_hours": _parse_duration(text),
         "language": _find_choice(text, languages, language_aliases),
     }
+    invalid_budget = extracted["budget_kzt"] is not None and extracted["budget_kzt"] <= 0
     for key, value in extracted.items():
-        if value is not None:
+        if key == "budget_kzt" and value is not None and value <= 0:
+            state[key] = None
+        elif value is not None:
             state[key] = value
 
     if not text and all(state.get(field) is None for field in REQUIRED):
