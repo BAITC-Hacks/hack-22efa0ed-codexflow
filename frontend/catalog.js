@@ -51,11 +51,12 @@ function card(provider) {
   })));
   more.append(description, availability);
 
-  article.append(category, title, id, city, price, facts, more);
+  article.append(category, title, id, city, price);
+  if (provider.price_imputed) article.append(element('p', 'catalog-price-note', t('Ориентировочная цена — уточните у специалиста')));
+  article.append(facts, more);
   const flags = element('div', 'catalog-flags');
   for (const [active, label] of [
     [provider.synthetic, 'Синтетический профиль'],
-    [provider.price_imputed, 'Цена дополнена в датасете'],
     [provider.city_imputed, 'Город дополнен в датасете'],
   ]) {
     if (active) flags.append(element('span', 'catalog-flag', t(label)));

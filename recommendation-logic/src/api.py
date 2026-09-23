@@ -7,7 +7,8 @@ from typing import Literal
 from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -16,10 +17,12 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from contractor_assistant.chat import assistant_turn
 from src.ai_explanations import get_explainer
+from src.http_safety import InputSafetyMiddleware, validation_details
 
 from src.recommendation import (
     CALENDAR_START, CALENDAR_END, Outcome, RecommendationRequest,
     load_providers, recommend, validate_request_field,
+    MAX_TEXT_LENGTH, MAX_BUDGET_KZT, MAX_DURATION_HOURS,
 )
 
 
@@ -32,6 +35,7 @@ app = FastAPI(
     description="Детерминированный подбор до трёх свободных подрядчиков из каталога.",
 )
 
+app.add_middleware(InputSafetyMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -42,20 +46,25 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(RequestValidationError)
+async def safe_validation_error(request, error):
+    return JSONResponse(status_code=422, content={'detail': validation_details(error.errors())})
+
+
 class RecommendationPayload(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    city: str = Field(min_length=1, examples=["Алматы"])
+    city: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH, examples=["Алматы"])
     event_date: str = Field(
         pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", examples=["2026-11-14"],
         description=f"Дата в пределах {CALENDAR_START} — {CALENDAR_END}, включительно.",
         json_schema_extra={"format": "date"},
     )
-    event_format: str = Field(min_length=1, examples=["корпоратив"])
-    category: str = Field(min_length=1, examples=["Ведущий"])
-    budget_kzt: int = Field(gt=0, examples=[500_000])
-    duration_hours: int | float | None = Field(default=None, gt=0, examples=[4.5])
-    language: str | None = Field(default=None, min_length=1, examples=["русский"])
+    event_format: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH, examples=["корпоратив"])
+    category: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH, examples=["Ведущий"])
+    budget_kzt: int = Field(gt=0, le=MAX_BUDGET_KZT, examples=[500_000])
+    duration_hours: int | float | None = Field(default=None, gt=0, le=MAX_DURATION_HOURS, examples=[4.5])
+    language: str | None = Field(default=None, min_length=1, max_length=MAX_TEXT_LENGTH, examples=["русский"])
 
     @field_validator("city", "event_date", "event_format", "category", "budget_kzt",
                      "duration_hours", "language", mode="before")
@@ -121,11 +130,11 @@ class AssistantChatResponse(BaseModel):
 
 
 @app.post("/assistant/chat", response_model=AssistantChatResponse)
-async def assistant_chat(payload: AssistantChatPayload) -> dict:
+async def assistant_chat(payload: AssistantChatPayload, ai_explanations: bool = Query(default=False)) -> dict:
     """Parse a chat turn, request missing details, and reuse the catalog matcher."""
     turn = assistant_turn(PROVIDERS, payload.message, payload.context.model_dump())
     result = turn.get("recommendation")
-    if turn.get("complete") and result:
+    if ai_explanations and turn.get("complete") and result:
         context = turn["context"]
         request = RecommendationRequest(
             city=context["city"], event_date=context["event_date"],

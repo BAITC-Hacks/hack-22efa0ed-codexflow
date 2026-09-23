@@ -17,6 +17,13 @@ REQUEST = RecommendationRequest('Алматы', '2026-10-07', 'свадьба', 
 
 
 class AIExplanationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_model_cannot_replace_distinct_band_facts_with_duplicate_explanations(self):
+        request = RecommendationRequest('Алматы', '2026-10-06', 'корпоратив', 'Лайв-бэнд', 2000000)
+        base = recommend(PROVIDERS, request)
+        result, source, reason = await self.service().enhance(base, PROVIDERS, request)
+        self.assertEqual((source, reason), ('fallback', 'duplicate_explanations'))
+        self.assertEqual(result, base)
+
     def setUp(self):
         self.base = recommend(PROVIDERS, REQUEST)
         self.calls = []

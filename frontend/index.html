@@ -5,20 +5,56 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Подбор подрядчиков для вашего события с объяснением каждого варианта.">
   <title>Повод — люди для вашего события</title>
+  <link rel="preload" href="./assets/fonts/GolosText-Variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="./assets/fonts/Lora-Variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="./assets/fonts/Lora-Italic.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="./assets/fonts/Manrope-Variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="./fonts.css">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./catalog.css">
-  <link rel="stylesheet" href="http://127.0.0.1:8000/assistant-assets/widget.css">
   <link rel="stylesheet" href="./theme.css">
   <script>try { const mode = localStorage.getItem('povod:theme'); const dark = mode === 'dark' || (mode !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; document.documentElement.style.colorScheme = dark ? 'dark' : 'light'; } catch {}</script>
   <script type="module" src="./app.js"></script>
-  <script defer src="http://127.0.0.1:8000/assistant-assets/widget.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#order-form">Перейти к подбору</a>
   <header class="site-header"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">п</span>повод<span class="brand-dot">/</span></a><span class="header-note">Подрядчики для ваших событий</span><div class="display-controls"><label class="sr-only" for="locale-select">Язык интерфейса</label><select id="locale-select"><option value="ru" lang="ru" data-original>Русский</option><option value="kk" lang="kk" data-original>Қазақша</option><option value="en" lang="en" data-original>English</option></select><button id="theme-toggle" data-i18n-ignore type="button" aria-label="Переключить на тёмную тему">☾</button></div><a id="mode-link" href="?demo=1">Открыть демо</a></header>
   <main>
-    <section class="intro"><div><p class="eyebrow">МЕНЬШЕ ПОИСКА. БОЛЬШЕ СОВПАДЕНИЙ.</p><h1>Найдите своих людей<br>для вашего события<span>.</span></h1><p class="intro-description">До трёх подходящих подрядчиков. С понятным объяснением каждого выбора.</p></div><div class="number-motion" data-paused="false"><div class="number-orbit" aria-hidden="true"><div class="orbit-center">до <strong>3</strong><small>вариантов</small></div><div class="orbit-track"><span class="orbit-number number-one"><span>01</span></span><span class="orbit-number number-two"><span>02</span></span><span class="orbit-number number-three"><span>03</span></span></div></div><button id="number-motion-toggle" type="button" aria-pressed="false">Остановить анимацию</button></div></section>
+    <section class="intro"><div><p class="eyebrow">МЕНЬШЕ ПОИСКА. БОЛЬШЕ СОВПАДЕНИЙ.</p><h1>Найдите своих людей<br><em>для вашего события.</em></h1><p class="intro-description">До трёх подходящих подрядчиков. С понятным объяснением каждого выбора.</p></div><div class="number-motion" data-paused="false"><div class="number-orbit" aria-hidden="true"><div class="orbit-center">до <strong>3</strong><small>вариантов</small></div><div class="orbit-track"><span class="orbit-number number-one"><span>01</span></span><span class="orbit-number number-two"><span>02</span></span><span class="orbit-number number-three"><span>03</span></span></div></div><button id="number-motion-toggle" type="button" aria-pressed="false">Остановить анимацию</button></div></section>
 <div class="event-marquee" role="img" aria-label="События: свадьбы, корпоративы, конференции, юбилеи и ваш особенный повод"><div class="marquee-track" aria-hidden="true"><div class="marquee-group"><span>Свадьбы <b aria-hidden="true">✦</b></span><span>Корпоративы <b aria-hidden="true">✦</b></span><span>Конференции <b aria-hidden="true">✦</b></span><span>Юбилеи <b aria-hidden="true">✦</b></span><span>Ваш особенный повод <b aria-hidden="true">✦</b></span></div><div class="marquee-group"><span>Свадьбы <b aria-hidden="true">✦</b></span><span>Корпоративы <b aria-hidden="true">✦</b></span><span>Конференции <b aria-hidden="true">✦</b></span><span>Юбилеи <b aria-hidden="true">✦</b></span><span>Ваш особенный повод <b aria-hidden="true">✦</b></span></div></div></div>
+    <section class="event-assistant" aria-label="Помощник по подбору">
+      <div class="event-assistant-entry">
+        <button id="describe-event" class="describe-event" type="button" aria-expanded="false" aria-controls="event-assistant-panel" aria-describedby="assistant-preview-note" disabled>
+          <span class="pearl-arch" aria-hidden="true"></span>
+          <span>Опишу своё событие</span><span class="describe-arrow" aria-hidden="true">↗</span>
+        </button>
+        <span id="assistant-preview-note" class="assistant-preview-note">Опишите → уточните → получите подборку</span>
+      </div>
+      <div id="event-assistant-panel" class="event-assistant-panel" role="region" aria-labelledby="event-assistant-title" hidden>
+        <button id="assistant-preview-close" class="assistant-preview-close" type="button" aria-label="Закрыть панель помощника">×</button>
+        <p class="eyebrow">ВАШЕ СОБЫТИЕ НАЧИНАЕТСЯ С ИДЕИ</p>
+        <h2 id="event-assistant-title" tabindex="-1">Сначала — несколько ваших слов.</h2>
+        <p>Опишите событие на русском. Помощник работает по правилам: найдёт параметры, спросит недостающее и передаст заявку в подбор. Ничего не бронирует.</p>
+        <form id="event-description-form">
+          <fieldset id="assistant-fields">
+            <div class="assistant-templates" aria-label="Шаблоны события">
+              <button type="button" data-assistant-template="wedding">Свадьба</button>
+              <button type="button" data-assistant-template="corporate">Корпоратив</button>
+              <button type="button" data-assistant-template="birthday">День рождения</button>
+            </div>
+            <label for="event-description">Ваше событие или уточнение</label>
+            <textarea id="event-description" maxlength="2000" rows="3" required placeholder="Свадьба в Алматы 7 октября, ведущий на казахском, бюджет до 1 млн" aria-describedby="assistant-help"></textarea>
+            <small id="assistant-help">Календарь: 23.09–31.12.2026. Можно начать с города, даты и повода.</small>
+            <button id="assistant-analyze" class="assistant-use-form" type="submit">Разобрать описание</button>
+            <button id="assistant-reset" class="assistant-reset" type="button">Начать заново</button>
+          </fieldset>
+        </form>
+        <p id="assistant-reply" class="assistant-preview-status" role="status" data-original lang="ru">Выберите пример или напишите своими словами. Перед поиском вы сможете проверить распознанные условия.</p>
+        <dl id="assistant-understood" class="assistant-understood" aria-label="Распознанные условия" hidden></dl>
+        <button id="assistant-apply" class="assistant-use-form" type="button" hidden>Применить и подобрать <span aria-hidden="true">↗</span></button>
+        <button id="assistant-use-form" class="assistant-use-form" type="button">Пока заполню форму <span aria-hidden="true">↗</span></button>
+      </div>
+    </section>
     <aside id="demo" hidden><span class="demo-icon" aria-hidden="true">ⓘ</span><div class="demo-content"><strong>Вы в демонстрационном режиме</strong><p>Здесь показаны готовые примеры. Чтобы подобрать людей под свои условия, перейдите к сервису.</p><label for="scenario">Посмотреть сценарий</label><select id="scenario"><option value="success">Три рекомендации</option><option value="rare">Редкая категория — два варианта</option><option value="no_category">В городе нет категории</option><option value="no_match">Никто не проходит по бюджету</option><option value="error">Ошибка соединения</option></select></div></aside>
     <div class="layout">
       <form id="order-form" novalidate>
@@ -52,5 +88,25 @@
     <footer><a class="footer-brand" href="./">повод.</a><p>Хороший выбор начинается с понятных причин.</p><span>Условия работы уточняются у подрядчика.</span></footer>
     <noscript>Включите JavaScript, чтобы заполнить форму и получить подборку.</noscript>
   </main>
+  <aside class="site-guide" aria-label="Справочник">
+    <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="false" aria-controls="guide-panel" hidden>
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C9 3.5 5 3.5 2 5v15c3-1.5 7-1.5 10 .5 3-2 7-2 10-.5V5c-3-1.5-7-1.5-10 .5Z"/><path d="M12 5.5v15M5.5 8.5l3 .4M15.5 8.9l3-.4"/></svg>
+      <span>Справочник</span>
+    </button>
+    <section id="guide-panel" class="guide-panel" role="dialog" aria-modal="false" aria-labelledby="guide-title" hidden>
+      <header class="guide-header"><div><h2 id="guide-title" tabindex="-1">Как устроен «Повод»</h2><p>Короткие ответы о сервисе. Без чата и ИИ.</p></div><button id="guide-close" class="guide-close" type="button" aria-label="Закрыть справочник">×</button></header>
+      <div class="guide-content">
+        <details open><summary>Для чего нужен этот сайт?</summary><p>«Повод» помогает найти специалистов для свадьбы, корпоратива и других событий. Вместо долгого просмотра каталога вы получаете до трёх вариантов под свои условия — с объяснением, почему подходит каждый.</p></details>
+        <details><summary>С чего начать подбор?</summary><p>Укажите категорию специалиста, формат события, город, дату и бюджет. При желании добавьте длительность и язык общения. Нажмите «Подобрать подрядчиков» и сравните результаты. Или начните с кнопки «Опишу своё событие».</p></details>
+        <details><summary>Как выбираются специалисты?</summary><p>Проверяем город, категорию, дату, формат, бюджет и ваши пожелания. Показываем до трёх подходящих профилей: сначала дешевле, при равной цене — по ID. Это не рейтинг качества.</p></details>
+        <details><summary>Как читать карточки и каталог?</summary><p>В подборке сравните цену и объяснение: оно связывает условия специалиста с вашим запросом. Раздел «О профиле» раскрывает подробности. Каталог ниже позволяет просмотреть профили отдельно; наличие в каталоге не означает, что специалист подходит на вашу дату.</p></details>
+        <details><summary>Что означает цена «от»?</summary><p>Это стартовая, не окончательная стоимость. Ориентировочные цены отмечены отдельно. Итоговую сумму и условия нужно уточнить у специалиста.</p></details>
+        <details><summary>Почему вариантов мало или нет?</summary><p>Категория может быть редкой, специалисты — занятыми, а бюджет или пожелания — ограничивать выбор. Причина указана в результате. Измените условия и повторите подбор.</p></details>
+        <details><summary>На какие даты работает подбор?</summary><p>Каталог содержит занятость с 23 сентября по 31 декабря 2026 года. Другая дата может изменить выдачу. Свободная дата в каталоге не является подтверждённой бронью.</p></details>
+        <details><summary>Как работает «Опишу своё событие»?</summary><p>Выберите шаблон или опишите событие на русском. Помощник по правилам уточнит недостающее. Проверьте условия и нажмите «Применить и подобрать» — результаты появятся на странице.</p></details>
+        <details><summary>Можно забронировать специалиста?</summary><p>Пока сервис только подбирает варианты. Кнопка «Связаться» не отправляет заявку; бронирование и оплата не подключены.</p></details>
+      </div>
+    </section>
+  </aside>
 </body>
 </html>

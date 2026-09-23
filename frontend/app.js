@@ -1,13 +1,15 @@
 import { t, locale, language, initializeLocale, translateTree } from './i18n.js';
 import { initializeTheme } from './theme.js';
 import { initializeCatalog } from './catalog.js';
-import { initializeAssistantUI } from './assistant-ui.js';
+import { initializeGuide } from './guide.js';
 import { initializeMotion } from './motion.js';
+import { initializeAssistantPreview } from './assistant-preview.js';
 import { MOCK_MODE } from './config.js';
 import { getFilters, recommend } from './api.js';
 import { renderRecommendations, renderSkeletons } from './cards.js';
 import { MOCK_REQUESTS } from './mocks.js';
 import { createFormState } from './form-state.js';
+import { validateValues, MAX_BUDGET_KZT, MAX_DURATION_HOURS } from './validation.js';
 
 initializeLocale();
 translateTree(document);
@@ -21,6 +23,9 @@ const filterStatus = document.querySelector('#filters-status');
 const status = document.querySelector('#request-status');
 const stale = document.querySelector('#stale-notice');
 const names = ['event_format', 'category', 'city', 'event_date', 'budget_kzt', 'duration_hours', 'language'];
+form.elements.budget_kzt.max = MAX_BUDGET_KZT;
+form.elements.duration_hours.min = '0'; // Exclusive lower bound is checked below.
+form.elements.duration_hours.max = MAX_DURATION_HOURS;
 const formState = createFormState(form, names, MOCK_MODE, scenario);
 let pending = false;
 let filters;
@@ -79,11 +84,25 @@ function collapseSearch(order) {
   searchRecap.hidden = false; editSearch.hidden = false;
 }
 editSearch.addEventListener('click', () => expandSearch());
+initializeAssistantPreview(() => {
+  expandSearch(!fields.disabled);
+  if (fields.disabled) {
+    form.setAttribute('tabindex', '-1');
+    form.focus();
+    form.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+  }
+}, async context => {
+  if (!filters || fields.disabled || pending || MOCK_MODE) return false;
+  expandSearch(false);
+  for (const name of names) form.elements[name].value = context[name] ?? '';
+  form.querySelector('.preferences').open = Boolean(context.language || context.duration_hours);
+  clearErrors(); formState.changed(); markStale();
+  const payload = validate();
+  if (!payload) return false;
+  submit({ payload, scenario: scenario.value, key: formKey() });
+  return true;
+});
 
-function today() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 function displayDate(value) { return value.split('-').reverse().join('.'); }
 function setError(name, message) {
   if (!names.includes(name)) return;
@@ -95,17 +114,8 @@ function setError(name, message) {
 function clearErrors() { names.forEach(name => setError(name, '')); }
 function validate() {
   const values = Object.fromEntries(new FormData(form));
-  const errors = {};
-  for (const name of ['event_format', 'category', 'city', 'event_date', 'budget_kzt']) {
-    if (!values[name]?.trim()) errors[name] = 'Заполните это поле.';
-  }
-  if (!errors.budget_kzt && (!Number.isSafeInteger(Number(values.budget_kzt)) || Number(values.budget_kzt) <= 0)) errors.budget_kzt = 'Введите целую сумму больше 0 ₸.';
-  if (values.duration_hours && (!Number.isFinite(Number(values.duration_hours)) || Number(values.duration_hours) <= 0)) errors.duration_hours = 'Введите число часов больше 0.';
+  const errors = validateValues(values, filters.event_date_range);
   if (form.elements.duration_hours.validity.badInput) errors.duration_hours = 'Введите корректное число часов.';
-  const minimum = MOCK_MODE ? filters.event_date_range.min : [today(), filters.event_date_range.min].sort().at(-1);
-  form.elements.event_date.min = minimum;
-  if (!errors.event_date && (!/^\d{4}-\d{2}-\d{2}$/.test(values.event_date) || !Number.isFinite(Date.parse(values.event_date)))) errors.event_date = 'Укажите корректную дату.';
-  if (!errors.event_date && (values.event_date < minimum || values.event_date > filters.event_date_range.max)) errors.event_date = { source: 'Выберите дату с {min} по {max}.', vars: { min: displayDate(minimum), max: displayDate(filters.event_date_range.max) } };
   for (const name of names) setError(name, errors[name] || '');
   formState.refresh();
   if (Object.keys(errors).length) { expandSearch(false); form.elements[Object.keys(errors)[0]].focus(); return null; }
@@ -229,13 +239,10 @@ async function loadFilters() {
     options('event_format', filters.event_formats, 'Какой у вас повод?');
     options('category', filters.categories, 'Выберите специалиста');
     options('language', filters.languages, 'Любой');
-    const minimum = MOCK_MODE ? filters.event_date_range.min : [today(), filters.event_date_range.min].sort().at(-1);
+    // This is a fixed hackathon calendar, also used by the backend and demo cases.
+    const minimum = filters.event_date_range.min;
     form.elements.event_date.min = minimum; form.elements.event_date.max = filters.event_date_range.max;
     document.querySelector('#date-help').textContent = t('Календарь: {min}–{max}', { min: displayDate(filters.event_date_range.min), max: displayDate(filters.event_date_range.max) });
-    if (minimum > filters.event_date_range.max) {
-      showFilterMessage('Календарь каталога закончился. Для реального подбора нужны новые данные; демо доступно по ссылке сверху.');
-      return;
-    }
     showFilterMessage(''); fields.disabled = false; scenario.disabled = false;
     if (!formState.restore() && MOCK_MODE) fillExample(scenario.value);
     formState.refresh();
@@ -290,6 +297,6 @@ document.addEventListener('localechange', () => {
   form.querySelector('.primary > span').textContent = t(pending ? 'Подбираем варианты…' : 'Подобрать подрядчиков');
 });
 initializeCatalog();
-initializeAssistantUI();
+initializeGuide();
 loadFilters();
 initializeMotion();

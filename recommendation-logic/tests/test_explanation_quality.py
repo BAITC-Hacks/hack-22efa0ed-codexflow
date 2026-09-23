@@ -9,6 +9,20 @@ from test_recommendation import provider
 HOSTS = RecommendationRequest('Алматы', '2026-10-07', 'свадьба', 'Ведущий', 1000000, language='казахский')
 
 class ExplanationQualityTests(unittest.TestCase):
+    def test_live_bands_use_distinct_source_facts_not_identical_repertoire(self):
+        request = RecommendationRequest('Алматы', '2026-10-06', 'корпоратив', 'Лайв-бэнд', 2000000)
+        cards = recommend(PROVIDERS, request)['cards']
+        by_id = {card['id']: card for card in cards}
+        first = by_id['HK-23752']['explanation']
+        second = by_id['HK-83709']['explanation']
+        self.assertNotEqual(first, second)
+        self.assertIn('4 вокалиста, струнный квартет', second)
+        self.assertIn('Музыкальный состав', second)
+        self.assertIn('ретро-шлягеров', first)
+
+    def test_generic_band_slogans_are_not_evidence(self):
+        self.assertEqual(description_evidence('Мы — Crimson Demon Live. Наши музыканты профессионалы своего дела. Их любовь к музыке передаётся каждой ноте.'), [])
+
     def test_hosts_explain_different_reasons_without_names(self):
         cards = recommend(PROVIDERS, HOSTS)['cards']
         expected = ['казахском, русском и английском', 'Опыт ведения свадеб 13 лет', 'европейская подача']
@@ -48,7 +62,7 @@ class ExplanationQualityTests(unittest.TestCase):
                 source = next(item for item in PROVIDERS if item.id == card['id'])
                 text = card['explanation']
                 self.assertEqual(text.count('.'), 2)
-                if text.startswith('Акцент профиля'):
+                if ' — в профиле: «' in text:
                     excerpt = text.split('«', 1)[1].split('».', 1)[0]
                     self.assertIn(excerpt, ' '.join(source.description.split()))
                 self.assertNotRegex(text.lower(), r'гарантированно|лучший выбор|идеальный выбор')

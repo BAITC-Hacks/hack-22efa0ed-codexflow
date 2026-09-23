@@ -46,7 +46,16 @@ async function request(url, payload) {
       }
       throw new ApiError('Сервис не принял параметры. Проверьте отмеченные поля и повторите подбор.', fields);
     }
-    if (!response.ok) throw new ApiError('Сервис временно недоступен (HTTP {status}). Попробуйте ещё раз.', {}, { status: response.status });
+    if (!response.ok) {
+      const messages = {
+        400: 'Запрос повреждён. Обновите страницу и повторите подбор.',
+        408: 'Передача запроса заняла слишком много времени. Повторите подбор.',
+        413: 'Запрос слишком большой. Обновите страницу и сократите введённые данные.',
+        415: 'Формат запроса не поддерживается. Обновите страницу.',
+        429: 'Слишком много запросов. Подождите немного и повторите подбор.',
+      };
+      throw new ApiError(messages[response.status] || 'Сервис временно недоступен (HTTP {status}). Попробуйте ещё раз.', {}, { status: response.status });
+    }
     try { return await response.json(); }
     catch { throw new ApiError('Сервис вернул ответ в неверном формате. Попробуйте ещё раз.'); }
   } catch (error) {
@@ -57,6 +66,13 @@ async function request(url, payload) {
 }
 export async function getFilters() {
   return validateFilters(MOCK_MODE ? structuredClone(MOCK_FILTERS) : await request(FILTERS_URL));
+}
+export async function assistantTurn(message, context = {}) {
+  const data = await request(new URL('/assistant/chat', API_URL).href, { message, context });
+  if (!plain(data) || !text(data.reply) || !plain(data.context) || typeof data.complete !== 'boolean') {
+    throw new ApiError('Сервис вернул неполный ответ. Попробуйте повторить запрос.');
+  }
+  return data;
 }
 export async function recommend(payload, scenario = 'success') {
   if (!MOCK_MODE) return validateRecommendations(await request(API_URL, payload));

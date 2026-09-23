@@ -10,10 +10,12 @@ from functools import lru_cache
 import hashlib
 import json
 import os
+import re
 
 import httpx
 
-from src.recommendation import Provider, RecommendationRequest, explanation_with_evidence, description_evidence
+from src.recommendation import (Provider, RecommendationRequest, explanation_with_evidence,
+                                description_evidence, normalize_request, _canonical_request)
 
 
 @dataclass(frozen=True)
@@ -23,6 +25,8 @@ class AISettings:
     model: str = "gpt-4o-mini"
     timeout_seconds: float = 6.0
     max_calls: int = 30
+    concurrency: int = 4
+    max_pending: int = 32
 
     @classmethod
     def from_env(cls):
@@ -44,6 +48,8 @@ class AIExplainer:
         self.transport = transport
         self._cache: OrderedDict[str, dict] = OrderedDict()
         self._lock = asyncio.Lock()
+        self._slots = asyncio.Semaphore(settings.concurrency)
+        self._pending: dict[str, asyncio.Task] = {}
         self._calls = 0
 
     async def enhance(self, result: dict, providers: list[Provider], request: RecommendationRequest):
@@ -59,13 +65,40 @@ class AIExplainer:
         selectable = {key: value for key, value in evidence.items() if value}
         if not selectable:
             return result, "rules", "no_evidence"
+        request = _canonical_request(normalize_request(request), providers)
+        if isinstance(request.duration_hours, float) and request.duration_hours.is_integer():
+            from dataclasses import replace
+            request = replace(request, duration_hours=int(request.duration_hours))
         # Include original cards and descriptions so changes in data invalidate the cache.
         context = {"request": asdict(request), "cards": result["cards"], "evidence": selectable}
         cache_key = hashlib.sha256(json.dumps([self.settings.model, context], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        # No awaits between cache/pending lookup and task registration: atomic in one event loop.
+        if cache_key in self._cache:
+            self._cache.move_to_end(cache_key)
+            return deepcopy(self._cache[cache_key]), "ai_cache", "ok"
+        task = self._pending.get(cache_key)
+        shared = task is not None
+        if task is None:
+            if self._calls >= self.settings.max_calls:
+                return result, "fallback", "call_limit"
+            if len(self._pending) >= self.settings.max_pending:
+                return result, "fallback", "busy"
+            task = asyncio.create_task(asyncio.wait_for(
+                self._enhance_locked(cache_key, context, selectable, result, lookup, request),
+                timeout=self.settings.timeout_seconds))
+            self._pending[cache_key] = task
+            def cleanup(done):
+                if self._pending.get(cache_key) is done:
+                    self._pending.pop(cache_key, None)
+                if not done.cancelled():
+                    done.exception()  # Consume even if every waiting HTTP request disconnected.
+            task.add_done_callback(cleanup)
         try:
-            # Total deadline also bounds time waiting for another caller, not just socket reads.
-            return await asyncio.wait_for(self._enhance_locked(cache_key, context, selectable, result, lookup, request),
-                                          timeout=self.settings.timeout_seconds)
+            # One caller disconnecting must not cancel work shared by other callers.
+            enriched, source, reason = await asyncio.shield(task)
+            if shared and source == "ai":
+                source = "ai_cache"
+            return deepcopy(enriched), source, reason
         except asyncio.TimeoutError:
             return result, "fallback", "timeout"
         except httpx.HTTPStatusError:
@@ -76,13 +109,12 @@ class AIExplainer:
             return result, "fallback", "invalid_response"
 
     async def _enhance_locked(self, key, context, evidence, result, lookup, request):
-        async with self._lock:
-            if key in self._cache:
-                self._cache.move_to_end(key)
-                return deepcopy(self._cache[key]), "ai_cache", "ok"
-            if self._calls >= self.settings.max_calls:
-                return result, "fallback", "call_limit"
-            self._calls += 1  # Failed requests also consume the local attempt budget.
+        async with self._slots:
+            # The state lock is short: network I/O never holds it.
+            async with self._lock:
+                if self._calls >= self.settings.max_calls:
+                    return result, "fallback", "call_limit"
+                self._calls += 1  # Failed requests also consume the local attempt budget.
             selection = await self._select(context, evidence)
             if not isinstance(selection, dict) or set(selection) != set(evidence):
                 raise ValueError("Unexpected contractor IDs")
@@ -94,6 +126,15 @@ class AIExplainer:
                 if card["id"] in selection:
                     excerpt = evidence[card["id"]][selection[card["id"]]]
                     card["explanation"] = explanation_with_evidence(lookup[card["id"]], request, excerpt)
+            # A model-selected quotation must not erase meaningful distinctions.
+            masked = []
+            for card in enriched['cards']:
+                text = card['explanation']
+                for candidate in enriched['cards']:
+                    text = re.sub(re.escape(candidate['name']), '[name]', text, flags=re.IGNORECASE)
+                masked.append(text)
+            if len(masked) != len(set(masked)):
+                return result, 'fallback', 'duplicate_explanations'
             self._cache[key] = deepcopy(enriched)
             if len(self._cache) > 128:
                 self._cache.popitem(last=False)

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from decimal import Decimal
 from typing import Any, Iterable
 
-from src.recommendation import Provider, RecommendationRequest, recommend
+from src.recommendation import Provider, RecommendationRequest, recommend, validate_request_field, MAX_BUDGET_KZT
 
 
 DATE_MIN = date(2026, 9, 23)
@@ -64,7 +65,7 @@ def _parse_date(text: str) -> str | None:
 
 def _parse_budget(text: str) -> int | None:
     pattern = re.compile(
-        r"(?<!\w)([+-]?\d{1,3}(?:[ \u00a0]\d{3})+|[+-]?\d{1,9}(?:[.,]\d+)?)"
+        r"(?<!\w)([+-]?\d{1,3}(?:[ \u00a0]\d{3})+|[+-]?\d+(?:[.,]\d+)?)"
         r"\s*(млн(?:ов)?|миллион(?:а|ов)?|тыс(?:яч[а-я]*)?\.?|тысяч[а-я]*|к|k|₸|тг|тенге)?",
         re.IGNORECASE,
     )
@@ -76,21 +77,35 @@ def _parse_budget(text: str) -> int | None:
         before = value[max(0, match.start() - 30):match.start()]
         has_budget = bool(re.search(r"(бюджет\w*|лимит)\s*(?:до\s*)?$", before))
         has_ceiling = bool(re.search(r"до\s*$", before))
+        # "до 4 часов" is a duration, not a new four-tenge budget.
+        after = value[match.end():].lstrip()
+        if not unit and not has_budget and re.match(r'(?:час|ч\b|мин)', after):
+            continue
         if not (unit or has_budget or has_ceiling):
             continue
-        amount = float(raw.replace(" ", "").replace("\u00a0", "").replace(",", "."))
+        amount = Decimal(raw.replace(" ", "").replace("\u00a0", "").replace(",", "."))
         if unit.startswith(("млн", "миллион")):
             amount *= 1_000_000
         elif unit.startswith("тыс") or unit in {"к", "k"}:
             amount *= 1_000
         score = (4 if has_budget else 0) + (3 if unit else 0) + (1 if has_ceiling else 0)
-        candidates.append((score, int(amount)))
+        bounded = MAX_BUDGET_KZT + 1 if amount > MAX_BUDGET_KZT or amount != amount.to_integral_value() else max(-1, int(amount))
+        candidates.append((score, bounded))
     return max(candidates, key=lambda item: item[0])[1] if candidates else None
 
 
 def _parse_duration(text: str) -> float | None:
-    match = re.search(r"(?<!\d)(\d+(?:[.,]\d+)?)\s*(?:ч\.?|час(?:а|ов)?)\b", _norm(text))
-    return float(match.group(1).replace(",", ".")) if match else None
+    value = _norm(text)
+    number = r"(?<!\w)([+-]?\d+(?:[.,]\d+)?)\s*"
+    hours = re.search(number + r"(?:час(?:а|ов)?|ч\.?)\b", value)
+    minutes = re.search(number + r"(?:минут(?:а|ы)?|мин\.?)\b", value)
+    if not hours and not minutes:
+        return None
+    hour_value = float(hours.group(1).replace(',', '.')) if hours else 0
+    minute_value = float(minutes.group(1).replace(',', '.')) if minutes else 0
+    if hour_value < 0 or minute_value < 0:
+        return -1
+    return hour_value + minute_value / 60
 
 
 def _aliases(providers: list[Provider]) -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, ...]],
@@ -188,11 +203,19 @@ def assistant_turn(providers: Iterable[Provider], message: str,
         "language": _find_choice(text, languages, language_aliases),
     }
     invalid_budget = extracted["budget_kzt"] is not None and extracted["budget_kzt"] <= 0
+    # An explicitly invalid correction must not silently reuse an old valid date.
+    month_pattern = '|'.join(MONTHS)
+    date_mentioned = re.search(rf'\d{{4}}-\d{{1,2}}-\d{{1,2}}|\d{{1,2}}[./]\d{{1,2}}[./]\d{{4}}|\d{{1,2}}\s+(?:{month_pattern})', _norm(text))
+    if date_mentioned and extracted['event_date'] is None:
+        state['event_date'] = None
     for key, value in extracted.items():
         if key == "budget_kzt" and value is not None and value <= 0:
             state[key] = None
         elif value is not None:
             state[key] = value
+
+    if re.search(r'язык\s+(?:любой|не\s*важен)|любой\s+язык|без\s+(?:ограничений|предпочтений)\s+по\s+языку', _norm(text)):
+        state['language'] = None
 
     if not text and all(state.get(field) is None for field in REQUIRED):
         return {"reply": "Напишите город, дату и повод мероприятия. Я уточню остальное и подберу подрядчиков.",
@@ -209,6 +232,16 @@ def assistant_turn(providers: Iterable[Provider], message: str,
     if invalid_budget:
         return {"reply": "Бюджет должен быть больше нуля. Какую максимальную сумму в тенге заложить?",
                 "context": state, "complete": False, "recommendation": None}
+
+    for field in ('budget_kzt', 'duration_hours'):
+        if state.get(field) is None:
+            continue
+        try:
+            validate_request_field(field, state[field])
+        except (TypeError, ValueError) as error:
+            state[field] = None
+            return {'reply': str(error) + ' Уточните это значение.', 'context': state,
+                    'complete': False, 'recommendation': None}
 
     if any(state.get(field) is None for field in REQUIRED):
         return {"reply": _missing_reply(state), "context": state, "complete": False, "recommendation": None}

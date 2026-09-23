@@ -27,7 +27,7 @@ export function createFormState(form, names, mockMode, scenario) {
     progressText.textContent = t('{count} из {total} заполнено', { count: completed, total: required.length });
     progress.setAttribute('aria-valuetext', progressText.textContent);
     const amount = Number(budget.value);
-    const valid = budget.value !== '' && Number.isSafeInteger(amount) && amount > 0;
+    const valid = budget.value !== '' && Number.isSafeInteger(amount) && amount > 0 && amount <= Number(budget.max);
     slider.max = valid ? String(Math.max(5000000, amount)) : '5000000';
     slider.value = valid ? String(amount) : '1';
     slider.setAttribute('aria-valuetext', valid ? t('До {price} ₸', { price: new Intl.NumberFormat(locale()).format(amount) }) : t('Бюджет не задан'));

@@ -1,4 +1,5 @@
 import { language, t } from './i18n.js';
+import { API_URL } from './config.js';
 
 let initialized = false;
 
@@ -6,6 +7,13 @@ let initialized = false;
 export function initializeAssistantUI() {
   if (initialized) return;
   initialized = true;
+  const stylesheet = document.createElement('link');
+  stylesheet.rel = 'stylesheet';
+  stylesheet.href = new URL('/assistant-assets/widget.css', API_URL).href;
+  document.head.append(stylesheet);
+  const script = document.createElement('script');
+  script.src = new URL('/assistant-assets/widget.js', API_URL).href;
+  document.head.append(script);
   let root;
   let observer;
   let note;

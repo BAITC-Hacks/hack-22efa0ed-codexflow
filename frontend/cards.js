@@ -69,7 +69,7 @@ export function renderRecommendations(container, data) {
     }
     const provenance = [];
     if (item.synthetic) provenance.push('Синтетический профиль');
-    if (item.price_imputed) provenance.push('Цена проставлена при подготовке датасета');
+    if (item.price_imputed) provenance.push('Ориентировочная цена — уточните у специалиста');
     if (item.city_imputed) provenance.push('Город проставлен при подготовке датасета');
     if (provenance.length) card.append(element('p', 'provenance', provenance.map(value => t(value)).join(' · ')));
     const action = element('button', 'card-action', 'Связаться ↗'); action.type = 'button';

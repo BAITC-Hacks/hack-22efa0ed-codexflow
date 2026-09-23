@@ -1,4 +1,6 @@
 /* Loaded after the page styles. The light design stays unchanged. */
+[data-theme='dark'] .event-assistant-panel { background: linear-gradient(135deg,#1a2332,#28263d); }
+[data-theme='dark'] .assistant-use-form { background: var(--surface-accent); color: var(--accent-ink); border-color: var(--line); }
 :root {
   color-scheme: light;
   --surface-subtle: #f4f6fc;

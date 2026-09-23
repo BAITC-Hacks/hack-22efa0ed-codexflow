@@ -1,7 +1,7 @@
-"""Deliberately RED repros, separate from the passing baseline suite.
+"""Formerly failing repros, now also collected by tests/test_security.py.
 
 python -m unittest discover -s qa -p test_known_weaknesses.py -v
-These assert desired behavior, not current bugs; do not mark them expectedFailure.
+These assert required behavior and must stay green; never mark expectedFailure.
 """
 import json
 import unittest

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import math
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import asdict, dataclass, replace
 from datetime import date
@@ -16,6 +17,9 @@ Outcome = Literal["matches", "category_absent", "no_match"]
 CALENDAR_START = "2026-09-23"
 CALENDAR_END = "2026-12-31"
 REASON_ORDER = ("busy", "budget", "format", "duration", "language")
+MAX_TEXT_LENGTH = 128
+MAX_BUDGET_KZT = 1_000_000_000
+MAX_DURATION_HOURS = 168
 
 
 @dataclass(frozen=True)
@@ -81,6 +85,11 @@ def validate_request_field(field: str, value):
             return None
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{field}: нужна непустая строка.")
+        if len(value) > MAX_TEXT_LENGTH:
+            raise ValueError(f"{field}: не более {MAX_TEXT_LENGTH} символов.")
+        if any(unicodedata.category(ch) in ("Cs", "Cf") or
+               (unicodedata.category(ch) == "Cc" and ch not in "\t\r\n") for ch in value):
+            raise ValueError(f"{field}: недопустимые управляющие символы или Unicode.")
         return value.strip()
     if field == "event_date":
         if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
@@ -92,8 +101,8 @@ def validate_request_field(field: str, value):
         if not CALENDAR_START <= value <= CALENDAR_END:
             raise ValueError(f"Данные о занятости доступны только с {CALENDAR_START} по {CALENDAR_END}.")
     elif field == "budget_kzt":
-        if type(value) is not int or value <= 0:
-            raise ValueError("Бюджет должен быть положительным целым числом в тенге.")
+        if type(value) is not int or not 0 < value <= MAX_BUDGET_KZT:
+            raise ValueError(f"Бюджет должен быть целым числом от 1 до {MAX_BUDGET_KZT} тенге.")
     elif field == "duration_hours":
         if value is None:
             return None
@@ -101,6 +110,8 @@ def validate_request_field(field: str, value):
             raise ValueError("Длительность должна быть положительным числом часов.")
         if isinstance(value, float) and not math.isfinite(value):
             raise ValueError("Длительность должна быть конечным числом часов.")
+        if value > MAX_DURATION_HOURS:
+            raise ValueError(f"Длительность не должна превышать {MAX_DURATION_HOURS} часов.")
     return value
 
 
@@ -170,7 +181,8 @@ def description_evidence(description: str, limit: int = 180) -> list[str]:
     experience = re.search(r"\bОпыт\s+[^.!?;]{0,60}?\b\d+\s+(?:лет|года?|год)\b", text, re.IGNORECASE)
     if experience:
         fragments.insert(0, experience.group())
-    rejected = r"топ[-\s]?\d|лучш|востребован|идеальн|безупреч|гарантир|0 развод|меня зовут|всем привет|всегда ваш|отличный выбор"
+    rejected = (r"топ[-\s]?\d|лучш|востребован|идеальн|безупреч|гарантир|0 развод|меня зовут|всем привет|всегда ваш|отличный выбор"
+                r"|незабываем|профессионалы своего дела|любовь к музыке|сверкаем|^мы\s*[—–-]")
     result = []
     for fragment in fragments:
         fragment = fragment.strip()
@@ -190,7 +202,8 @@ def _relevant_evidence(provider: Provider, request: RecommendationRequest) -> st
                     "юбилей": ("юбил",), "день рождения": ("день рождения",)}
     concrete = ("опыт", "лет", "заказ", "сезонн", "палитр", "букет", "казахск", "английск", "русск",
                 "репортаж", "документаль", "позирован", "панорам", "гостей", "кейтеринг", "парковк",
-                "террас", "кухн", "европейск", "традици", "телевиден", "сценари", "оборудован")
+                "террас", "кухн", "европейск", "традици", "телевиден", "сценари", "оборудован",
+                "вокалист", "квартет", "барабанщик", "гитарист", "перкуссионист", "брасс", "саксофон")
     def score(text):
         key = text.casefold()
         return (sum(3 for stem in format_stems.get(request.event_format, ()) if stem in key)
@@ -199,11 +212,35 @@ def _relevant_evidence(provider: Provider, request: RecommendationRequest) -> st
     return max(candidates, key=score)
 
 
+def _evidence_heading(evidence: str) -> str:
+    """Editorial framing only: the quoted fact remains unchanged and attributed."""
+    text = evidence.casefold()
+    if 'состав' in text and any(word in text for word in ('вокалист', 'музыкант', 'квартет')):
+        return 'Музыкальный состав'
+    if 'палитр' in text:
+        return 'Оформление под вашу палитру'
+    if 'опыт' in text and 'свад' in text:
+        return 'Опыт именно в свадьбах'
+    if 'язык' in text:
+        return 'Языки общения с гостями'
+    if 'стиль' in text or 'подача' in text:
+        return 'Стиль и подача'
+    if 'заказ' in text and re.search(r'\d', text):
+        return 'Практика в цифрах'
+    if any(stem in text for stem in ('панорам', 'террас', 'интерьер')):
+        return 'Атмосфера площадки'
+    if any(stem in text for stem in ('репортаж', 'позирован', 'съёмк', 'съемк')):
+        return 'Взгляд на ваше событие'
+    if 'сценари' in text:
+        return 'Подход к сценарию'
+    return 'Деталь, на которую стоит обратить внимание'
+
+
 def _card(provider: Provider, request: RecommendationRequest, *, description_signal: str | None = None) -> dict:
     if description_signal is None:
         description_signal = _relevant_evidence(provider, request)
     if description_signal:
-        first_sentence = f"Акцент профиля — «{description_signal}»."
+        first_sentence = f"{_evidence_heading(description_signal)} — в профиле: «{description_signal}»."
     else:
         first_sentence = f"В профиле указаны языки: {', '.join(provider.languages)}"
         if provider.max_hours is not None:
