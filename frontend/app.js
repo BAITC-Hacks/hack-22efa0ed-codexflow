@@ -11,7 +11,6 @@ const fields = document.querySelector('#fields');
 const scenario = document.querySelector('#scenario');
 const filterStatus = document.querySelector('#filters-status');
 const status = document.querySelector('#request-status');
-const summary = document.querySelector('#request-summary');
 const stale = document.querySelector('#stale-notice');
 const names = ['event_format', 'category', 'city', 'event_date', 'budget_kzt', 'duration_hours', 'language'];
 const formState = createFormState(form, names, MOCK_MODE, scenario);
@@ -30,16 +29,38 @@ const searchRecap = document.querySelector('#search-recap');
 function expandSearch(focus = true) {
   fields.hidden = false;
   form.classList.remove('is-compact');
+  form.querySelector('.form-heading h2').textContent = 'Расскажите о событии';
+  editSearch.setAttribute('aria-expanded', 'true');
   editSearch.hidden = true; searchRecap.hidden = true;
   if (focus) {
     form.elements.category.focus();
     form.scrollIntoView?.({ block: 'start', behavior: 'auto' });
   }
 }
-function collapseSearch() {
+function collapseSearch(order) {
   fields.hidden = true;
   form.classList.add('is-compact');
-  searchRecap.textContent = summary.textContent;
+  form.querySelector('.form-heading h2').textContent = MOCK_MODE ? 'Параметры демо-сценария' : 'Параметры вашего события';
+  editSearch.setAttribute('aria-expanded', 'false');
+  const totalMinutes = order.duration_hours == null ? null : Math.round(order.duration_hours * 60);
+  const duration = totalMinutes === null ? 'Не указана' : totalMinutes === 0 ? 'Менее 1 мин' :
+    [Math.floor(totalMinutes / 60) ? `${Math.floor(totalMinutes / 60)} ч` : '', totalMinutes % 60 ? `${totalMinutes % 60} мин` : ''].filter(Boolean).join(' ');
+  const entries = [
+    ['Город', order.city],
+    ['Кого ищем', order.category],
+    ['Событие', order.event_format.charAt(0).toUpperCase() + order.event_format.slice(1)],
+    ['Дата', new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${order.event_date}T12:00:00`))],
+    ['Бюджет', `До ${new Intl.NumberFormat('ru-RU').format(order.budget_kzt)} ₸`],
+    ['Язык', order.language || 'Любой'],
+    ['Длительность', duration],
+  ];
+  searchRecap.replaceChildren();
+  entries.forEach(([label, value]) => {
+    const item = document.createElement('div'); item.className = 'recap-item';
+    const term = document.createElement('dt'); term.textContent = label;
+    const description = document.createElement('dd'); description.textContent = value;
+    item.append(term, description); searchRecap.append(item);
+  });
   searchRecap.hidden = false; editSearch.hidden = false;
 }
 editSearch.addEventListener('click', () => expandSearch());
@@ -128,12 +149,9 @@ async function submit(request) {
   editSearch.disabled = true;
   const submitLabel = form.querySelector('.primary > span');
   submitLabel.textContent = 'Подбираем варианты…';
-  stale.hidden = true; summary.hidden = false;
+  stale.hidden = true;
   const p = request.payload;
   const shown = MOCK_MODE ? MOCK_REQUESTS[request.scenario] || MOCK_REQUESTS.success : p;
-  summary.textContent = [MOCK_MODE ? 'Сценарий демо' : null, shown.city, shown.category, shown.event_format,
-    displayDate(shown.event_date), `до ${new Intl.NumberFormat('ru-RU').format(shown.budget_kzt)} ₸`,
-    shown.language, shown.duration_hours ? `${shown.duration_hours} ч` : null].filter(Boolean).join(' · ');
   status.textContent = 'Подбираем подрядчиков.';
   result.setAttribute('aria-busy', 'true');
   await showResult(view => renderSkeletons(view, true), true);
@@ -143,7 +161,7 @@ async function submit(request) {
     if (data.outcome === 'matches') await showResult(view => renderRecommendations(view, data), true);
     else await showResult(view => message(view, data.outcome === 'category_absent' ? 'В городе нет этой категории' : 'Нет подходящих вариантов', data.message), true);
     status.textContent = data.message;
-    collapseSearch();
+    collapseSearch(shown);
   } catch (error) {
     status.textContent = error.message;
     clearErrors();

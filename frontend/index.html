@@ -17,7 +17,7 @@
     <aside id="demo" hidden><span class="demo-icon" aria-hidden="true">ⓘ</span><div class="demo-content"><strong>Вы в демонстрационном режиме</strong><p>Здесь показаны готовые примеры. Чтобы подобрать людей под свои условия, перейдите к сервису.</p><label for="scenario">Посмотреть сценарий</label><select id="scenario"><option value="success">Три рекомендации</option><option value="rare">Редкая категория — два варианта</option><option value="no_category">В городе нет категории</option><option value="no_match">Никто не проходит по бюджету</option><option value="error">Ошибка соединения</option></select></div></aside>
     <div class="layout">
       <form id="order-form" novalidate>
-        <div class="search-header"><div class="form-heading"><span class="step">01</span><div><h2>Расскажите о событии</h2><p>Пять основных параметров — и можно выбирать.</p></div></div><button id="edit-search" type="button" aria-controls="fields" aria-expanded="false" hidden>Изменить параметры <span aria-hidden="true">↗</span></button></div><p id="search-recap" hidden></p>
+        <div class="search-header"><div class="form-heading"><span class="step">01</span><div><h2>Расскажите о событии</h2><p>Пять основных параметров — и можно выбирать.</p></div></div><button id="edit-search" type="button" aria-controls="fields" aria-expanded="false" hidden>Изменить параметры <span aria-hidden="true">↗</span></button></div><dl id="search-recap" aria-label="Выбранные параметры события" hidden></dl>
         <div class="form-completion"><label id="progress-text" for="form-progress">0 из 5 заполнено</label><progress id="form-progress" max="5" value="0"></progress></div>
         <div id="filters-status" role="status">Готовим варианты для вашей формы…</div>
         <fieldset id="fields" disabled>
@@ -41,7 +41,7 @@
         </fieldset>
         <div class="form-footer"><span class="hint">* Нужны для подбора</span><span id="draft-status" class="draft-status" role="status"></span></div>
       </form>
-      <section class="results" aria-labelledby="results-title"><div class="results-heading"><div class="section-title"><span class="step">02</span><div><h2 id="results-title" tabindex="-1">Ваша подборка</h2><p>Сравните условия и причины, по которым подходит каждый вариант.</p></div></div><span class="results-mark">ДО 3 ВАРИАНТОВ</span></div><p id="request-summary" hidden></p><p id="stale-notice" hidden>Вы изменили пожелания. Обновите подборку, чтобы увидеть подходящие варианты.</p><div id="request-status" class="sr-only" role="status"></div><div id="result"></div></section>
+      <section class="results" aria-labelledby="results-title"><div class="results-heading"><div class="section-title"><span class="step">02</span><div><h2 id="results-title" tabindex="-1">Ваша подборка</h2><p>Сравните условия и причины, по которым подходит каждый вариант.</p></div></div><span class="results-mark">ДО 3 ВАРИАНТОВ</span></div><p id="stale-notice" hidden>Вы изменили пожелания. Обновите подборку, чтобы увидеть подходящие варианты.</p><div id="request-status" class="sr-only" role="status"></div><div id="result"></div></section>
     </div>
     <footer><a class="footer-brand" href="./">повод.</a><p>Хороший выбор начинается с понятных причин.</p><span>Условия работы уточняются у подрядчика.</span></footer>
     <noscript>Включите JavaScript, чтобы заполнить форму и получить подборку.</noscript>
