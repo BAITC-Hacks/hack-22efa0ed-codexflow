@@ -6,13 +6,16 @@
   <meta name="description" content="Подбор подрядчиков для вашего события с объяснением каждого варианта.">
   <title>Повод — люди для вашего события</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./catalog.css">
   <link rel="stylesheet" href="http://127.0.0.1:8000/assistant-assets/widget.css">
+  <link rel="stylesheet" href="./theme.css">
+  <script>try { const mode = localStorage.getItem('povod:theme'); const dark = mode === 'dark' || (mode !== 'light' && window.matchMedia?.('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; document.documentElement.style.colorScheme = dark ? 'dark' : 'light'; } catch {}</script>
   <script type="module" src="./app.js"></script>
   <script defer src="http://127.0.0.1:8000/assistant-assets/widget.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#order-form">Перейти к подбору</a>
-  <header class="site-header"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">п</span>повод<span class="brand-dot">/</span></a><span class="header-note">Подрядчики для ваших событий</span><a id="mode-link" href="?demo=1">Открыть демо</a></header>
+  <header class="site-header"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">п</span>повод<span class="brand-dot">/</span></a><span class="header-note">Подрядчики для ваших событий</span><div class="display-controls"><label class="sr-only" for="locale-select">Язык интерфейса</label><select id="locale-select"><option value="ru" lang="ru" data-original>Русский</option><option value="kk" lang="kk" data-original>Қазақша</option><option value="en" lang="en" data-original>English</option></select><button id="theme-toggle" data-i18n-ignore type="button" aria-label="Переключить на тёмную тему">☾</button></div><a id="mode-link" href="?demo=1">Открыть демо</a></header>
   <main>
     <section class="intro"><div><p class="eyebrow">МЕНЬШЕ ПОИСКА. БОЛЬШЕ СОВПАДЕНИЙ.</p><h1>Найдите своих людей<br>для вашего события<span>.</span></h1><p class="intro-description">До трёх подходящих подрядчиков. С понятным объяснением каждого выбора.</p></div><div class="number-motion" data-paused="false"><div class="number-orbit" aria-hidden="true"><div class="orbit-center">до <strong>3</strong><small>вариантов</small></div><div class="orbit-track"><span class="orbit-number number-one"><span>01</span></span><span class="orbit-number number-two"><span>02</span></span><span class="orbit-number number-three"><span>03</span></span></div></div><button id="number-motion-toggle" type="button" aria-pressed="false">Остановить анимацию</button></div></section>
 <div class="event-marquee" role="img" aria-label="События: свадьбы, корпоративы, конференции, юбилеи и ваш особенный повод"><div class="marquee-track" aria-hidden="true"><div class="marquee-group"><span>Свадьбы <b aria-hidden="true">✦</b></span><span>Корпоративы <b aria-hidden="true">✦</b></span><span>Конференции <b aria-hidden="true">✦</b></span><span>Юбилеи <b aria-hidden="true">✦</b></span><span>Ваш особенный повод <b aria-hidden="true">✦</b></span></div><div class="marquee-group"><span>Свадьбы <b aria-hidden="true">✦</b></span><span>Корпоративы <b aria-hidden="true">✦</b></span><span>Конференции <b aria-hidden="true">✦</b></span><span>Юбилеи <b aria-hidden="true">✦</b></span><span>Ваш особенный повод <b aria-hidden="true">✦</b></span></div></div></div>
@@ -43,8 +46,9 @@
         </fieldset>
         <div class="form-footer"><span class="hint">* Нужны для подбора</span><span id="draft-status" class="draft-status" role="status"></span></div>
       </form>
-      <section class="results" aria-labelledby="results-title"><div class="results-heading"><div class="section-title"><span class="step">02</span><div><h2 id="results-title" tabindex="-1">Ваша подборка</h2><p>Сравните условия и причины, по которым подходит каждый вариант.</p></div></div><span class="results-mark">ДО 3 ВАРИАНТОВ</span></div><p id="stale-notice" hidden>Вы изменили пожелания. Обновите подборку, чтобы увидеть подходящие варианты.</p><div id="request-status" class="sr-only" role="status"></div><div id="result"></div></section>
+      <section class="results" aria-labelledby="results-title" hidden><div class="results-heading"><div class="section-title"><span class="step">02</span><div><h2 id="results-title" tabindex="-1">Ваша подборка</h2><p>Сравните условия и причины, по которым подходит каждый вариант.</p></div></div><span class="results-mark">ДО 3 ВАРИАНТОВ</span></div><p id="stale-notice" hidden>Вы изменили пожелания. Обновите подборку, чтобы увидеть подходящие варианты.</p><div id="request-status" data-original class="sr-only" role="status"></div><div id="result"></div></section>
     </div>
+    <section id="catalog-root" class="catalog-section" aria-label="Каталог подрядчиков"></section>
     <footer><a class="footer-brand" href="./">повод.</a><p>Хороший выбор начинается с понятных причин.</p><span>Условия работы уточняются у подрядчика.</span></footer>
     <noscript>Включите JavaScript, чтобы заполнить форму и получить подборку.</noscript>
   </main>

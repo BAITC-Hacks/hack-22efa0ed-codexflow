@@ -1,7 +1,8 @@
+import { t, locale, language } from './i18n.js';
 function element(tag, className, text) {
   const node = document.createElement(tag);
   node.className = className;
-  if (text != null) node.textContent = text;
+  if (text != null) node.textContent = t(text);
   return node;
 }
 const categoryStyles = [
@@ -13,7 +14,7 @@ function categoryBadge(categories) {
   const style = categoryStyles.find(group => categories.some(name => group.names.includes(name))) || { icon: '✦', tone: 'event' };
   const badge = element('span', `category category-${style.tone}`);
   const icon = element('span', 'category-icon', style.icon); icon.setAttribute('aria-hidden', 'true');
-  badge.append(icon, element('span', '', categories.join(' · ')));
+  badge.append(icon, element('span', '', categories.map(value => t(value)).join(' · ')));
   return badge;
 }
 export function renderSkeletons(container, loading = false) {
@@ -36,7 +37,8 @@ export function renderRecommendations(container, data) {
   container.replaceChildren();
   container.classList.remove('skeleton-state', 'is-loading');
   container.classList.add('has-cards');
-  container.append(element('p', 'result-summary', data.message));
+  const summary = element('p', 'result-summary'); summary.textContent = data.message; summary.dataset.original = ''; summary.lang = 'ru'; container.append(summary);
+  if (language() !== 'ru') container.append(element('p', 'source-language', 'Текст сервиса на русском'));
   const grid = element('div', 'cards');
   data.cards.forEach((item, index) => {
     const card = element('article', 'card');
@@ -49,27 +51,27 @@ export function renderRecommendations(container, data) {
     card.append(visual);
     const top = element('div', 'card-top');
     top.append(categoryBadge(item.categories), element('span', 'rank', `0${index + 1}`));
-    card.append(top, element('h3', '', item.name));
+    const name = element('h3', ''); name.textContent = item.name; name.dataset.original = ''; card.append(top, name);
     const details = element('div', 'card-details');
-    details.append(element('span', 'card-location', item.city), element('span', 'card-price', `от ${new Intl.NumberFormat('ru-RU').format(item.price_from_kzt)} ₸`));
+    details.append(element('span', 'card-location', item.city), element('span', 'card-price', t('от {price} ₸', { price: new Intl.NumberFormat(locale()).format(item.price_from_kzt) })));
     const reason = element('div', 'reason');
     const reasonLabel = element('span', 'reason-label');
     const star = element('span', 'reason-star', '✓'); star.setAttribute('aria-hidden', 'true');
-    reasonLabel.append(star, document.createTextNode(' Почему подходит'));
-    reason.append(reasonLabel, element('p', '', item.explanation));
+    reasonLabel.append(star, document.createTextNode(' ' + t('Почему подходит')));
+    const explanation = element('p', ''); explanation.textContent = item.explanation; explanation.dataset.original = ''; explanation.lang = 'ru'; reason.append(reasonLabel, explanation);
     card.append(reason, details);
     if (typeof item.caveats === 'string' && item.caveats.trim()) {
       const caveat = element('aside', 'caveat');
       const heading = element('strong', 'caveat-heading');
       const icon = element('span', '', '⚠'); icon.setAttribute('aria-hidden', 'true');
-      heading.append(icon, document.createTextNode(' Что учесть'));
-      caveat.append(heading, element('p', '', item.caveats)); card.append(caveat);
+      heading.append(icon, document.createTextNode(' ' + t('Что учесть')));
+      const caveatText = element('p', ''); caveatText.textContent = item.caveats; caveatText.dataset.original = ''; caveatText.lang = 'ru'; caveat.append(heading, caveatText); card.append(caveat);
     }
     const provenance = [];
     if (item.synthetic) provenance.push('Синтетический профиль');
     if (item.price_imputed) provenance.push('Цена проставлена при подготовке датасета');
     if (item.city_imputed) provenance.push('Город проставлен при подготовке датасета');
-    if (provenance.length) card.append(element('p', 'provenance', provenance.join(' · ')));
+    if (provenance.length) card.append(element('p', 'provenance', provenance.map(value => t(value)).join(' · ')));
     const action = element('button', 'card-action', 'Связаться ↗'); action.type = 'button';
     const availability = element('p', 'availability-note', 'Доступно в полной версии. Сейчас сервис помогает подобрать подрядчика.');
     availability.id = `availability-${index}`; availability.hidden = true; availability.setAttribute('role', 'status');

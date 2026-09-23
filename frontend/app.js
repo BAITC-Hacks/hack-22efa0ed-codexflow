@@ -1,9 +1,17 @@
+import { t, locale, language, initializeLocale, translateTree } from './i18n.js';
+import { initializeTheme } from './theme.js';
+import { initializeCatalog } from './catalog.js';
+import { initializeAssistantUI } from './assistant-ui.js';
 import { initializeMotion } from './motion.js';
 import { MOCK_MODE } from './config.js';
 import { getFilters, recommend } from './api.js';
 import { renderRecommendations, renderSkeletons } from './cards.js';
 import { MOCK_REQUESTS } from './mocks.js';
 import { createFormState } from './form-state.js';
+
+initializeLocale();
+translateTree(document);
+const theme = initializeTheme({ getLabel: isDark => t(isDark ? 'Переключить на светлую тему' : 'Переключить на тёмную тему') });
 
 const form = document.querySelector('#order-form');
 const result = document.querySelector('#result');
@@ -18,9 +26,15 @@ let pending = false;
 let filters;
 let hasResult = false;
 let lastSubmittedKey = null;
+let currentRenderer = null;
+let recapOrder = null;
+let filterMessage = null;
+let requestError = null;
+const fieldMessages = {};
+const errorText = error => t(error.rawMessage || error.message, error.messageVars || {});
 const formKey = () => JSON.stringify(names.map(name => form.elements[name].value).concat(scenario.value));
 const modeLink = document.querySelector('#mode-link');
-modeLink.textContent = MOCK_MODE ? 'Перейти к сервису' : 'Открыть демо';
+modeLink.textContent = t(MOCK_MODE ? 'Перейти к сервису' : 'Открыть демо');
 modeLink.href = MOCK_MODE ? '?demo=0' : '?demo=1';
 document.querySelector('#demo').hidden = !MOCK_MODE;
 
@@ -29,7 +43,7 @@ const searchRecap = document.querySelector('#search-recap');
 function expandSearch(focus = true) {
   fields.hidden = false;
   form.classList.remove('is-compact');
-  form.querySelector('.form-heading h2').textContent = 'Расскажите о событии';
+  form.querySelector('.form-heading h2').textContent = t('Расскажите о событии');
   editSearch.setAttribute('aria-expanded', 'true');
   editSearch.hidden = true; searchRecap.hidden = true;
   if (focus) {
@@ -38,26 +52,27 @@ function expandSearch(focus = true) {
   }
 }
 function collapseSearch(order) {
+  recapOrder = order;
   fields.hidden = true;
   form.classList.add('is-compact');
-  form.querySelector('.form-heading h2').textContent = MOCK_MODE ? 'Параметры демо-сценария' : 'Параметры вашего события';
+  form.querySelector('.form-heading h2').textContent = t(MOCK_MODE ? 'Параметры демо-сценария' : 'Параметры вашего события');
   editSearch.setAttribute('aria-expanded', 'false');
   const totalMinutes = order.duration_hours == null ? null : Math.round(order.duration_hours * 60);
-  const duration = totalMinutes === null ? 'Не указана' : totalMinutes === 0 ? 'Менее 1 мин' :
-    [Math.floor(totalMinutes / 60) ? `${Math.floor(totalMinutes / 60)} ч` : '', totalMinutes % 60 ? `${totalMinutes % 60} мин` : ''].filter(Boolean).join(' ');
+  const duration = totalMinutes === null ? t('Не указана') : totalMinutes === 0 ? t('Менее 1 мин') :
+    [Math.floor(totalMinutes / 60) ? t('{hours} ч', { hours: Math.floor(totalMinutes / 60) }) : '', totalMinutes % 60 ? t('{minutes} мин', { minutes: totalMinutes % 60 }) : ''].filter(Boolean).join(' ');
   const entries = [
-    ['Город', order.city],
-    ['Кого ищем', order.category],
-    ['Событие', order.event_format.charAt(0).toUpperCase() + order.event_format.slice(1)],
-    ['Дата', new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${order.event_date}T12:00:00`))],
-    ['Бюджет', `До ${new Intl.NumberFormat('ru-RU').format(order.budget_kzt)} ₸`],
-    ['Язык', order.language || 'Любой'],
+    ['Город', t(order.city)],
+    ['Кого ищем', t(order.category)],
+    ['Событие', t(order.event_format.charAt(0).toUpperCase() + order.event_format.slice(1))],
+    ['Дата', new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${order.event_date}T12:00:00`))],
+    ['Бюджет', t('До {price} ₸', { price: new Intl.NumberFormat(locale()).format(order.budget_kzt) })],
+    ['Язык', t(order.language || 'Любой')],
     ['Длительность', duration],
   ];
   searchRecap.replaceChildren();
   entries.forEach(([label, value]) => {
     const item = document.createElement('div'); item.className = 'recap-item';
-    const term = document.createElement('dt'); term.textContent = label;
+    const term = document.createElement('dt'); term.textContent = t(label);
     const description = document.createElement('dd'); description.textContent = value;
     item.append(term, description); searchRecap.append(item);
   });
@@ -72,7 +87,8 @@ function today() {
 function displayDate(value) { return value.split('-').reverse().join('.'); }
 function setError(name, message) {
   if (!names.includes(name)) return;
-  document.getElementById(`${name}-error`).textContent = message;
+  fieldMessages[name] = message;
+  document.getElementById(`${name}-error`).textContent = typeof message === 'object' ? t(message.source, message.vars) : t(message);
   form.elements[name].setAttribute('aria-invalid', String(Boolean(message)));
   if (message && form.elements[name].closest('details')) form.elements[name].closest('details').open = true;
 }
@@ -89,7 +105,7 @@ function validate() {
   const minimum = MOCK_MODE ? filters.event_date_range.min : [today(), filters.event_date_range.min].sort().at(-1);
   form.elements.event_date.min = minimum;
   if (!errors.event_date && (!/^\d{4}-\d{2}-\d{2}$/.test(values.event_date) || !Number.isFinite(Date.parse(values.event_date)))) errors.event_date = 'Укажите корректную дату.';
-  if (!errors.event_date && (values.event_date < minimum || values.event_date > filters.event_date_range.max)) errors.event_date = `Выберите дату с ${displayDate(minimum)} по ${displayDate(filters.event_date_range.max)}.`;
+  if (!errors.event_date && (values.event_date < minimum || values.event_date > filters.event_date_range.max)) errors.event_date = { source: 'Выберите дату с {min} по {max}.', vars: { min: displayDate(minimum), max: displayDate(filters.event_date_range.max) } };
   for (const name of names) setError(name, errors[name] || '');
   formState.refresh();
   if (Object.keys(errors).length) { expandSearch(false); form.elements[Object.keys(errors)[0]].focus(); return null; }
@@ -104,14 +120,17 @@ function message(container, title, text, error = false) {
   container.classList.add('message-state');
   const icon = document.createElement('div'); icon.className = 'state-illustration'; icon.textContent = error ? '↺' : '✳'; icon.setAttribute('aria-hidden', 'true');
   container.append(icon);
-  const heading = document.createElement('h3'); heading.textContent = title;
-  const paragraph = document.createElement('p'); paragraph.textContent = text;
+  const heading = document.createElement('h3'); heading.textContent = t(title);
+  const paragraph = document.createElement('p'); paragraph.textContent = error ? t(text) : text;
+  if (!error) { paragraph.dataset.original = ''; paragraph.lang = 'ru'; }
   container.append(heading, paragraph);
+  if (!error && language() !== 'ru') { const note = document.createElement('small'); note.className = 'source-language'; note.textContent = t('Текст сервиса на русском'); container.append(note); }
   if (!error) container.append(button('Изменить пожелания', () => {
     expandSearch();
   }));
 }
 async function showResult(render, animate = false) {
+  currentRenderer = render;
   const previous = result.querySelector('.result-view');
   const next = document.createElement('div'); next.className = 'result-view';
   render(next);
@@ -132,7 +151,7 @@ async function showResult(render, animate = false) {
   next.classList.remove('view-enter');
 }
 function button(label, action) {
-  const node = document.createElement('button'); node.type = 'button'; node.className = 'retry'; node.textContent = label;
+  const node = document.createElement('button'); node.type = 'button'; node.className = 'retry'; node.textContent = t(label);
   node.addEventListener('click', action); return node;
 }
 function markStale() { stale.hidden = !hasResult || formKey() === lastSubmittedKey; }
@@ -145,14 +164,17 @@ function fillExample(key) {
 }
 async function submit(request) {
   if (pending) return;
+  requestError = null;
+  document.querySelector('.results').hidden = false;
   pending = true; fields.disabled = true; scenario.disabled = true;
   editSearch.disabled = true;
   const submitLabel = form.querySelector('.primary > span');
-  submitLabel.textContent = 'Подбираем варианты…';
+  submitLabel.textContent = t('Подбираем варианты…');
   stale.hidden = true;
   const p = request.payload;
   const shown = MOCK_MODE ? MOCK_REQUESTS[request.scenario] || MOCK_REQUESTS.success : p;
-  status.textContent = 'Подбираем подрядчиков.';
+  status.textContent = t('Подбираем подрядчиков.');
+  status.lang = language();
   result.setAttribute('aria-busy', 'true');
   await showResult(view => renderSkeletons(view, true), true);
   let invalidField;
@@ -161,21 +183,24 @@ async function submit(request) {
     if (data.outcome === 'matches') await showResult(view => renderRecommendations(view, data), true);
     else await showResult(view => message(view, data.outcome === 'category_absent' ? 'В городе нет этой категории' : 'Нет подходящих вариантов', data.message), true);
     status.textContent = data.message;
+    status.lang = 'ru';
     collapseSearch(shown);
   } catch (error) {
-    status.textContent = error.message;
+    requestError = error;
+    status.textContent = errorText(error);
+    status.lang = language();
     clearErrors();
     for (const [name, text] of Object.entries(error.fieldErrors || {})) {
       if (names.includes(name)) { setError(name, text); invalidField ||= name; }
     }
     await showResult(view => {
-      message(view, 'Попробуем ещё раз?', error.message, true);
+      message(view, 'Попробуем ещё раз?', errorText(error), true);
       if (!invalidField) view.append(button('Повторить', () => submit(request)));
     }, true);
   } finally {
     pending = false; fields.disabled = false; scenario.disabled = false;
     editSearch.disabled = false;
-    form.querySelector('.primary > span').textContent = 'Подобрать подрядчиков';
+    form.querySelector('.primary > span').textContent = t('Подобрать подрядчиков');
     result.setAttribute('aria-busy', 'false'); hasResult = true;
     formState.refresh();
     lastSubmittedKey = request.key; markStale();
@@ -187,11 +212,16 @@ async function submit(request) {
   }
 }
 function options(name, values, placeholder) {
-  const select = form.elements[name]; select.replaceChildren(new Option(placeholder, ''));
-  values.forEach(value => select.add(new Option(value, value)));
+  const select = form.elements[name]; select.replaceChildren(new Option(t(placeholder), ''));
+  values.forEach(value => select.add(new Option(t(value), value)));
+}
+function showFilterMessage(source, retry = false, vars = {}) {
+  filterMessage = { source, retry, vars };
+  filterStatus.replaceChildren(document.createTextNode(t(source, vars)));
+  if (retry) filterStatus.append(document.createTextNode(' '), button('Повторить загрузку', loadFilters));
 }
 async function loadFilters() {
-  filterStatus.replaceChildren(); filterStatus.textContent = 'Загружаем параметры каталога…';
+  showFilterMessage('Загружаем параметры каталога…');
   fields.disabled = true; scenario.disabled = true;
   try {
     filters = await getFilters();
@@ -201,17 +231,16 @@ async function loadFilters() {
     options('language', filters.languages, 'Любой');
     const minimum = MOCK_MODE ? filters.event_date_range.min : [today(), filters.event_date_range.min].sort().at(-1);
     form.elements.event_date.min = minimum; form.elements.event_date.max = filters.event_date_range.max;
-    document.querySelector('#date-help').textContent = `Календарь: ${displayDate(filters.event_date_range.min)}–${displayDate(filters.event_date_range.max)}`;
+    document.querySelector('#date-help').textContent = t('Календарь: {min}–{max}', { min: displayDate(filters.event_date_range.min), max: displayDate(filters.event_date_range.max) });
     if (minimum > filters.event_date_range.max) {
-      filterStatus.textContent = 'Календарь каталога закончился. Для реального подбора нужны новые данные; демо доступно по ссылке сверху.';
+      showFilterMessage('Календарь каталога закончился. Для реального подбора нужны новые данные; демо доступно по ссылке сверху.');
       return;
     }
-    filterStatus.textContent = ''; fields.disabled = false; scenario.disabled = false;
+    showFilterMessage(''); fields.disabled = false; scenario.disabled = false;
     if (!formState.restore() && MOCK_MODE) fillExample(scenario.value);
     formState.refresh();
   } catch (error) {
-    filterStatus.textContent = error.message + ' ';
-    filterStatus.append(button('Повторить загрузку', loadFilters));
+    showFilterMessage(error.rawMessage || error.message, true, error.messageVars);
   }
 }
 form.addEventListener('submit', event => {
@@ -235,6 +264,32 @@ form.querySelectorAll('[data-example]').forEach(node => node.addEventListener('c
   if (MOCK_MODE) scenario.value = node.dataset.example;
   fillExample(node.dataset.example);
 }));
-showResult(view => renderSkeletons(view));
+document.addEventListener('localechange', () => {
+  translateTree(document);
+  theme.refresh();
+  modeLink.textContent = t(MOCK_MODE ? 'Перейти к сервису' : 'Открыть демо');
+  if (filterMessage) showFilterMessage(filterMessage.source, filterMessage.retry, filterMessage.vars);
+  if (filters) {
+    const selected = Object.fromEntries(names.map(name => [name, form.elements[name].value]));
+    options('city', filters.cities, 'Выберите город');
+    options('event_format', filters.event_formats, 'Какой у вас повод?');
+    options('category', filters.categories, 'Выберите специалиста');
+    options('language', filters.languages, 'Любой');
+    for (const name of names) form.elements[name].value = selected[name];
+    document.querySelector('#date-help').textContent = t('Календарь: {min}–{max}', { min: displayDate(filters.event_date_range.min), max: displayDate(filters.event_date_range.max) });
+  }
+  for (const [name, message] of Object.entries(fieldMessages)) setError(name, message);
+  formState.refresh();
+  if (recapOrder && form.classList.contains('is-compact')) collapseSearch(recapOrder);
+  else form.querySelector('.form-heading h2').textContent = t('Расскажите о событии');
+  if (currentRenderer) showResult(currentRenderer);
+  if (pending || requestError) {
+    status.textContent = requestError ? errorText(requestError) : t('Подбираем подрядчиков.');
+    status.lang = language();
+  }
+  form.querySelector('.primary > span').textContent = t(pending ? 'Подбираем варианты…' : 'Подобрать подрядчиков');
+});
+initializeCatalog();
+initializeAssistantUI();
 loadFilters();
 initializeMotion();

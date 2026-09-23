@@ -1,6 +1,7 @@
+import { t, locale } from './i18n.js';
 import { MOCK_REQUESTS } from './mocks.js';
 
-const currency = value => `${new Intl.NumberFormat('ru-RU').format(value)} ₸`;
+const currency = value => `${new Intl.NumberFormat(locale()).format(value)} ₸`;
 
 export function createFormState(form, names, mockMode, scenario) {
   const storageKey = `povod:order:${mockMode ? 'demo' : 'live'}:v1`;
@@ -14,6 +15,7 @@ export function createFormState(form, names, mockMode, scenario) {
   const sliderMax = document.querySelector('#budget-slider-max');
 
   function refresh() {
+    if (draftStatus.dataset.message) draftStatus.textContent = t(draftStatus.dataset.message);
     const completed = required.filter(field => field.value.trim() && field.validity.valid && field.getAttribute('aria-invalid') !== 'true').length;
     progress.max = required.length;
     progress.value = completed;
@@ -22,14 +24,14 @@ export function createFormState(form, names, mockMode, scenario) {
       const selected = preset && names.every(name => form.elements[name].value === String(preset[name] ?? ''));
       chip.setAttribute('aria-pressed', String(selected));
     });
-    progressText.textContent = `${completed} из ${required.length} заполнено`;
+    progressText.textContent = t('{count} из {total} заполнено', { count: completed, total: required.length });
     progress.setAttribute('aria-valuetext', progressText.textContent);
     const amount = Number(budget.value);
     const valid = budget.value !== '' && Number.isSafeInteger(amount) && amount > 0;
     slider.max = valid ? String(Math.max(5000000, amount)) : '5000000';
     slider.value = valid ? String(amount) : '1';
-    slider.setAttribute('aria-valuetext', valid ? `До ${currency(amount)}` : 'Бюджет не задан');
-    budgetValue.textContent = valid ? `до ${currency(amount)}` : 'Бюджет не задан';
+    slider.setAttribute('aria-valuetext', valid ? t('До {price} ₸', { price: new Intl.NumberFormat(locale()).format(amount) }) : t('Бюджет не задан'));
+    budgetValue.textContent = valid ? t('до {price} ₸', { price: new Intl.NumberFormat(locale()).format(amount) }) : t('Бюджет не задан');
     sliderMax.textContent = currency(Number(slider.max));
     slider.style.setProperty('--range-fill', `${(Number(slider.value) - 1) / (Number(slider.max) - 1) * 100}%`);
   }
@@ -37,9 +39,9 @@ export function createFormState(form, names, mockMode, scenario) {
     const values = Object.fromEntries(names.map(name => [name, form.elements[name].value]));
     try {
       localStorage.setItem(storageKey, JSON.stringify({ version: 1, values, scenario: scenario.value }));
-      draftStatus.textContent = 'Черновик сохранён на этом устройстве';
+      draftStatus.dataset.message = 'Черновик сохранён на этом устройстве'; draftStatus.textContent = t(draftStatus.dataset.message);
     } catch {
-      draftStatus.textContent = 'Автосохранение недоступно в этом браузере';
+      draftStatus.dataset.message = 'Автосохранение недоступно в этом браузере'; draftStatus.textContent = t(draftStatus.dataset.message);
     }
   }
   function restore() {
@@ -55,12 +57,12 @@ export function createFormState(form, names, mockMode, scenario) {
         restored = true;
       }
       if (mockMode && [...scenario.options].some(option => option.value === draft.scenario)) scenario.value = draft.scenario;
-      if (restored) draftStatus.textContent = 'Черновик восстановлен на этом устройстве';
+      if (restored) { draftStatus.dataset.message = 'Черновик восстановлен на этом устройстве'; draftStatus.textContent = t(draftStatus.dataset.message); }
       if (form.elements.duration_hours.value || form.elements.language.value) form.querySelector('.preferences').open = true;
       refresh();
       return restored;
     } catch {
-      draftStatus.textContent = 'Не удалось восстановить черновик. Можно заполнить форму заново.';
+      draftStatus.dataset.message = 'Не удалось восстановить черновик. Можно заполнить форму заново.'; draftStatus.textContent = t(draftStatus.dataset.message);
       return false;
     }
   }

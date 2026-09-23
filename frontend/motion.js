@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 export function initializeMotion() {
   const preference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   const numberMotion = document.querySelector('.number-motion');
@@ -8,11 +9,12 @@ export function initializeMotion() {
     document.body.dataset.motionPaused = numberMotion.dataset.paused;
     toggle.hidden = Boolean(preference?.matches);
     toggle.setAttribute('aria-pressed', String(paused));
-    toggle.textContent = paused ? 'Продолжить анимацию' : 'Остановить анимацию';
+    toggle.textContent = t(paused ? 'Продолжить анимацию' : 'Остановить анимацию');
   }
   toggle.addEventListener('click', () => { paused = !paused; updateNumbers(); });
   preference?.addEventListener?.('change', updateNumbers);
   updateNumbers();
+  document.addEventListener('localechange', updateNumbers);
   if (preference?.matches || !('IntersectionObserver' in window)) return;
   const sections = [...document.querySelectorAll('#order-form, .results, footer')];
   const observer = new IntersectionObserver(entries => {

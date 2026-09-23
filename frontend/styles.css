@@ -98,6 +98,32 @@ button:disabled {
   flex:1;
 }
 
+.display-controls {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-left:auto;
+}
+
+#locale-select {
+  width:116px;
+  min-height:44px;
+  padding:10px 12px;
+  font-size:13px;
+  border-radius:10px;
+}
+
+.source-language {
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin:8px 0 20px;
+}
+
+.result-summary:has(+ .source-language) {
+  margin-bottom:0;
+}
+
 #mode-link {
   display: inline-flex;
   align-items: center;
@@ -1188,6 +1214,8 @@ button:active:not(:disabled) {
   }
   .site-header {
     justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
   }
   .search-grid {
     grid-template-columns:1fr;

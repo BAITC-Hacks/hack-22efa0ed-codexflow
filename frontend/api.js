@@ -1,8 +1,9 @@
+import { t } from './i18n.js';
 import { API_URL, FILTERS_URL, MOCK_MODE, REQUEST_TIMEOUT_MS } from './config.js';
 import { MOCK_RESPONSES, MOCK_FILTERS } from './mocks.js';
 
 export class ApiError extends Error {
-  constructor(message, fieldErrors = {}) { super(message); this.fieldErrors = fieldErrors; }
+  constructor(message, fieldErrors = {}, messageVars = {}) { super(t(message, messageVars)); this.rawMessage = message; this.messageVars = messageVars; this.fieldErrors = fieldErrors; }
 }
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const strings = value => Array.isArray(value) && value.every(item => typeof item === 'string' && item.trim());
@@ -45,7 +46,7 @@ async function request(url, payload) {
       }
       throw new ApiError('Сервис не принял параметры. Проверьте отмеченные поля и повторите подбор.', fields);
     }
-    if (!response.ok) throw new ApiError(`Сервис временно недоступен (HTTP ${response.status}). Попробуйте ещё раз.`);
+    if (!response.ok) throw new ApiError('Сервис временно недоступен (HTTP {status}). Попробуйте ещё раз.', {}, { status: response.status });
     try { return await response.json(); }
     catch { throw new ApiError('Сервис вернул ответ в неверном формате. Попробуйте ещё раз.'); }
   } catch (error) {
