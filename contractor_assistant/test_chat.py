@@ -76,15 +76,17 @@ class AssistantTurnTests(unittest.TestCase):
         self.assertIn("23.09.2026", turn["reply"])
 
     def test_non_positive_budget_is_not_accepted(self):
-        turn = assistant_turn(
-            self.providers,
-            "Астана, 12 ноября, день рождения, фотограф, бюджет 0",
-        )
+        for value in ("0", "-100"):
+            with self.subTest(value=value):
+                turn = assistant_turn(
+                    self.providers,
+                    f"Астана, 12 ноября, день рождения, фотограф, бюджет {value}",
+                )
 
-        self.assertFalse(turn["complete"])
-        self.assertIsNone(turn["recommendation"])
-        self.assertIsNone(turn["context"]["budget_kzt"])
-        self.assertIn("больше нуля", turn["reply"])
+                self.assertFalse(turn["complete"])
+                self.assertIsNone(turn["recommendation"])
+                self.assertIsNone(turn["context"]["budget_kzt"])
+                self.assertIn("больше нуля", turn["reply"])
 
     def test_empty_message_returns_a_helpful_prompt(self):
         turn = assistant_turn(self.providers, "")
