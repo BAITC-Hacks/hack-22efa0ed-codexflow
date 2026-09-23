@@ -3,9 +3,12 @@
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from src.ai_explanations import get_explainer
 
 from src.recommendation import (
     CALENDAR_START, CALENDAR_END, Outcome, RecommendationRequest,
@@ -28,6 +31,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
+    expose_headers=["X-Explanation-Source", "X-AI-Reason"],
 )
 
 
@@ -103,5 +107,19 @@ def filters() -> dict:
 
 
 @app.post("/recommendations", response_model=RecommendationResponse)
-def get_recommendations(payload: RecommendationPayload) -> dict:
-    return recommend(PROVIDERS, payload.to_domain())
+async def get_recommendations(payload: RecommendationPayload, response: Response,
+                              ai_explanations: bool = Query(default=False)) -> dict:
+    request = payload.to_domain()
+    result = recommend(PROVIDERS, request)
+    source, reason = "rules", "not_requested"
+    if ai_explanations:
+        result, source, reason = await get_explainer().enhance(result, PROVIDERS, request)
+    response.headers["X-Explanation-Source"] = source
+    response.headers["X-AI-Reason"] = reason
+    return result
+
+
+# Only expose the public frontend directory, never the repository or its .git.
+FRONTEND_PATH = Path(__file__).resolve().parents[2] / "frontend"
+if FRONTEND_PATH.is_dir():
+    app.mount("/ui", StaticFiles(directory=FRONTEND_PATH, html=True), name="frontend")

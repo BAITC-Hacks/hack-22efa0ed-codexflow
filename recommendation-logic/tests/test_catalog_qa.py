@@ -101,15 +101,13 @@ class CatalogQualityAssuranceTests(unittest.TestCase):
                 if result["outcome"] == "matches" and ids:
                     outputs.setdefault(ids, (request, result))
             if len(outputs) > 1:
-                (_, first), (_, second) = list(outputs.values())[:2]
-                found_pair = (first, second)
+                found_pair = list(outputs.values())[:2]
                 break
 
         self.assertIsNotNone(found_pair, "The supplied calendar should alter at least one recommendation")
-        for result in found_pair:
+        for request, result in found_pair:
             self.assertTrue(result["cards"])
-            request_date = result["cards"][0]["explanation"].split(" ")[1]
-            self.assertTrue(all(request_date in card["explanation"] for card in result["cards"]))
+            self.assertTrue(all(request.event_date in card["explanation"] for card in result["cards"]))
 
     def test_cards_in_one_result_have_non_interchangeable_explanations(self):
         requests = [

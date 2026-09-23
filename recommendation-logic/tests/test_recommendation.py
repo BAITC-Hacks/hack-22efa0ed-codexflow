@@ -44,7 +44,7 @@ class RecommendationTests(unittest.TestCase):
         )
         self.assertEqual(result["outcome"], "matches")
         self.assertEqual([card["id"] for card in result["cards"]], ["HK-003", "HK-002"])
-        self.assertIn("заняты", result["message"])
+        self.assertIn("занят", result["message"])
 
     def test_is_deterministic_when_prices_are_equal(self):
         result = recommend([provider(id="HK-020"), provider(id="HK-010")], REQUEST)
@@ -64,7 +64,7 @@ class RecommendationTests(unittest.TestCase):
             REQUEST,
         )
         self.assertEqual(result["outcome"], "no_match")
-        self.assertIn("заняты", result["message"])
+        self.assertIn("занят", result["message"])
         self.assertIn("бюджет", result["message"])
 
     def test_checks_optional_language_and_duration(self):
@@ -76,8 +76,8 @@ class RecommendationTests(unittest.TestCase):
             REQUEST,
         )
         self.assertEqual(result["outcome"], "no_match")
-        self.assertIn("языке", result["message"])
-        self.assertIn("длительности", result["message"])
+        self.assertIn("язык", result["message"])
+        self.assertIn("длительность", result["message"])
 
     def test_explains_small_catalog_when_no_one_was_rejected(self):
         result = recommend([provider()], REQUEST)

@@ -126,12 +126,66 @@ class ContractRegressionTests(TestCase):
         self.assertEqual(response["properties"]["cards"]["maxItems"], 3)
         self.assertIn("explanation", schema["components"]["schemas"]["RecommendationCard"]["required"])
 
-    def test_description_truncation_preserves_words_and_marks_omission(self):
-        description = "Авторское оформление мероприятий цветами и индивидуальный подход к каждой площадке с учётом пожеланий заказчика"
-        excerpt = _description_excerpt(description)
-        self.assertTrue(excerpt.endswith("…"))
-        prefix = excerpt[:-1]
-        self.assertTrue(description.startswith(prefix + " "))
+    def test_description_uses_complete_facts_or_omits_long_sentences(self):
+        self.assertEqual(_description_excerpt("Короткая фраза о профиле. Ещё одно предложение."),
+                         "Короткая фраза о профиле")
+        self.assertEqual(_description_excerpt("Длинное описание без законченных мыслей " * 20), "")
+        self.assertEqual(_description_excerpt("Опыт ведения свадеб 13 лет Вел свадьбы в Алматы Статистика: 356 свадеб, 0 разводов"),
+                         "Опыт ведения свадеб 13 лет")
+        self.assertEqual(_description_excerpt("Длинное описание " * 20 + ". Работаем с сезонными цветами."),
+                         "Работаем с сезонными цветами")
+
+    def test_case_variants_match_canonical_results_through_both_layers(self):
+        canonical = BASE | dict(event_date="2026-10-07", event_format="свадьба",
+                                budget_kzt=1000000, language="казахский")
+        expected = self.client.post("/recommendations", json=canonical).json()
+        for transform in (str.upper, str.lower, str.title, str.swapcase):
+            variant = {key: transform(value) if key in ("city", "category", "event_format", "language") else value
+                       for key, value in canonical.items()}
+            self.assertEqual(self.client.post("/recommendations", json=variant).json(), expected)
+            self.assertEqual(recommend(iter(PROVIDERS), RecommendationRequest(**variant)), expected)
+        for field in ("city", "category", "event_format", "language"):
+            for p in PROVIDERS:
+                payload = BASE | dict(city=p.city, category=p.categories[0], event_format=p.event_formats[0],
+                                      language=p.languages[0])
+                altered = payload | {field: payload[field].swapcase()}
+                self.assertEqual(recommend(PROVIDERS, RecommendationRequest(**altered)),
+                                 recommend(PROVIDERS, RecommendationRequest(**payload)))
+
+    def test_language_inflection_and_emilia_excerpt(self):
+        for language, phrase in (("русский", "на русском языке"), ("казахский", "на казахском языке"),
+                                 ("английский", "на английском языке")):
+            candidates = [provider(languages=(language,))]
+            card = recommend(candidates, RecommendationRequest(**(BASE | {"language": language})))["cards"][0]
+            self.assertIn(phrase, card["explanation"])
+        result = self.client.post("/recommendations", json=BASE | dict(
+            event_date="2026-10-07", event_format="свадьба", budget_kzt=1000000, language="казахский")).json()
+        emilia = next(card for card in result["cards"] if card["name"] == "Эмилия")
+        self.assertIn("«Опыт ведения свадеб 13 лет»", emilia["explanation"])
+        self.assertNotIn("0…", emilia["explanation"])
+
+    def test_busy_demo_explains_only_otherwise_eligible_profiles(self):
+        payload = BASE | dict(event_date="2026-10-03", event_format="свадьба",
+                              budget_kzt=1000000, language="казахский")
+        result = self.client.post("/recommendations", json=payload).json()
+        self.assertEqual(result["outcome"], "no_match")
+        self.assertIn("По остальным условиям подходят 4 профиля, но все они заняты на 2026-10-03", result["message"])
+        self.assertIn("По остальным условиям подходит 1 профиль", result["message"])
+        self.assertIn("выше бюджета", result["message"])
+        self.assertEqual(result["stats"]["rejected"]["busy"], 7)
+
+    def test_budget_demo_reports_actual_minimum_price(self):
+        result = self.client.post("/recommendations", json=BASE | dict(event_date="2026-10-04",
+            event_format="свадьба", category="Флорист", budget_kzt=100000, language="русский")).json()
+        self.assertIn("2 профиля", result["message"])
+        self.assertIn("цена от 200 000 ₸ выше бюджета 100 000 ₸", result["message"])
+
+    def test_overlapping_failures_do_not_get_single_blocker_claim(self):
+        candidates = [provider(price_from_kzt=7000000, busy_dates=frozenset({BASE["event_date"]}))]
+        result = recommend(candidates, RecommendationRequest(**BASE))
+        self.assertIn("каждый не проходит несколько условий", result["message"])
+        self.assertNotIn("По остальным условиям", result["message"])
+        self.assertEqual(result["stats"]["rejected"], {"busy": 1, "budget": 1})
 
     def test_reasons_are_stable_when_catalog_order_changes(self):
         candidates = [provider(id="one", price_from_kzt=7000000),

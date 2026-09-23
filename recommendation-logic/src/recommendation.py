@@ -111,13 +111,40 @@ def normalize_request(request: RecommendationRequest) -> RecommendationRequest:
     })
 
 
-def _description_excerpt(description: str, limit: int = 110) -> str:
-    signal = " ".join(description.split(".", 1)[0].split())
-    if len(signal) <= limit:
-        return signal
-    # A displayed ellipsis makes the quotation's truncation explicit.
-    words = signal[:limit + 1].rsplit(" ", 1)
-    return (words[0].rstrip(" ,;:") + "…") if len(words) > 1 else ""
+def _text_key(value: str) -> str:
+    return " ".join(value.split()).casefold()
+
+
+def _canonical_request(request: RecommendationRequest, providers: list[Provider]) -> RecommendationRequest:
+    """Match case-insensitively while keeping catalog spelling in explanations."""
+    values = {
+        "city": {p.city for p in providers},
+        "category": {v for p in providers for v in p.categories},
+        "event_format": {v for p in providers for v in p.event_formats},
+        "language": {v for p in providers for v in p.languages},
+    }
+    updates = {}
+    for field, options in values.items():
+        value = getattr(request, field)
+        if value is not None:
+            mapping = {_text_key(option): option for option in sorted(options, reverse=True)}
+            updates[field] = mapping.get(_text_key(value), _text_key(value))
+    return replace(request, **updates)
+
+
+def _description_excerpt(description: str, limit: int = 160) -> str:
+    text = " ".join(description.split())
+    # Extract a complete experience fact even from a paragraph without punctuation.
+    experience = re.search(r"\bОпыт\s+[^.!?;]{0,60}?\b\d+\s+(?:лет|года?|год)\b", text, re.IGNORECASE)
+    if experience and len(experience.group()) <= limit:
+        return experience.group()
+    # Never cut a sentence or a number halfway through. If no short statement
+    # exists, use structured profile facts in the card instead of a broken quote.
+    for sentence in re.split(r"[.!?](?:\s+|$)", text):
+        sentence = sentence.strip()
+        if len(sentence.split()) >= 3 and len(sentence) <= limit:
+            return sentence
+    return ""
 
 
 def _rejection_reasons(provider: Provider, request: RecommendationRequest) -> set[str]:
@@ -126,33 +153,81 @@ def _rejection_reasons(provider: Provider, request: RecommendationRequest) -> se
         reasons.add("busy")
     if provider.price_from_kzt > request.budget_kzt:
         reasons.add("budget")
-    if request.event_format not in provider.event_formats:
+    if _text_key(request.event_format) not in {_text_key(v) for v in provider.event_formats}:
         reasons.add("format")
     if request.duration_hours is not None and provider.max_hours is not None:
         if provider.max_hours < request.duration_hours:
             reasons.add("duration")
-    if request.language is not None and request.language not in provider.languages:
+    if request.language is not None and _text_key(request.language) not in {_text_key(v) for v in provider.languages}:
         reasons.add("language")
     return reasons
 
 
-def _card(provider: Provider, request: RecommendationRequest) -> dict:
-    first_sentence = f"Свободен {request.event_date} и берёт формат «{request.event_format}»"
-    if request.language:
-        first_sentence += f", работает на {request.language}"
-    first_sentence += "."
+def description_evidence(description: str, limit: int = 180) -> list[str]:
+    """Complete source facts, excluding greetings, generic praise and unsafe markup."""
+    text = " ".join(description.split())
+    fragments = re.split(r"[.!?](?:\s+|$)", text)
+    experience = re.search(r"\bОпыт\s+[^.!?;]{0,60}?\b\d+\s+(?:лет|года?|год)\b", text, re.IGNORECASE)
+    if experience:
+        fragments.insert(0, experience.group())
+    rejected = r"топ[-\s]?\d|лучш|востребован|идеальн|безупреч|гарантир|0 развод|меня зовут|всем привет|всегда ваш|отличный выбор"
+    result = []
+    for fragment in fragments:
+        fragment = fragment.strip()
+        if (3 <= len(fragment.split()) and len(fragment) <= limit
+                and not re.search(rejected, fragment, re.IGNORECASE)
+                and not re.search(r"[<>.!?]", fragment) and fragment not in result):
+            result.append(fragment)
+    return result
 
-    details = [
-        f"Цена от {provider.price_from_kzt:,} ₸ укладывается в бюджет {request.budget_kzt:,} ₸.".replace(
-            ",", " "
-        ).rstrip("."),
-    ]
-    if request.duration_hours and provider.max_hours is not None:
-        hours = str(request.duration_hours).removesuffix(".0").replace(".", ",")
-        details.append(f"готов работать до {provider.max_hours} ч при запросе на {hours} ч")
-    description_signal = _description_excerpt(provider.description)
+
+def _relevant_evidence(provider: Provider, request: RecommendationRequest) -> str:
+    candidates = description_evidence(provider.description)
+    if not candidates:
+        return ""
+    format_stems = {"свадьба": ("свад", "невест", "молодож"), "корпоратив": ("корпоратив", "бизнес", "команд", "тимбилдинг"),
+                    "конференция": ("конференц", "форум", "презентац"), "той": ("той", "традиц"),
+                    "юбилей": ("юбил",), "день рождения": ("день рождения",)}
+    concrete = ("опыт", "лет", "заказ", "сезонн", "палитр", "букет", "казахск", "английск", "русск",
+                "репортаж", "документаль", "позирован", "панорам", "гостей", "кейтеринг", "парковк",
+                "террас", "кухн", "европейск", "традици", "телевиден", "сценари", "оборудован")
+    def score(text):
+        key = text.casefold()
+        return (sum(3 for stem in format_stems.get(request.event_format, ()) if stem in key)
+                + sum(2 for stem in concrete if stem in key) + (4 if re.search(r"\d", key) else 0))
+    # Stable tie-break by source position, never by random wording or model output.
+    return max(candidates, key=score)
+
+
+def _card(provider: Provider, request: RecommendationRequest, *, description_signal: str | None = None) -> dict:
+    if description_signal is None:
+        description_signal = _relevant_evidence(provider, request)
     if description_signal:
-        details.append(f"в профиле отмечено: «{description_signal}»")
+        first_sentence = f"Акцент профиля — «{description_signal}»."
+    else:
+        first_sentence = f"В профиле указаны языки: {', '.join(provider.languages)}"
+        if provider.max_hours is not None:
+            first_sentence += f"; время на площадке — до {provider.max_hours} ч"
+        first_sentence += "; подробностей о стиле работы в каталоге недостаточно."
+
+    conditions = f"Для формата «{request.event_format}» в городе «{provider.city}» дата {request.event_date} свободна по календарю"
+    if request.language:
+        language_forms = {"русский": "русском", "казахский": "казахском", "английский": "английском"}
+        language = language_forms.get(_text_key(request.language))
+        conditions += f", работает на {language} языке" if language else f", язык работы — {request.language}"
+    details = [conditions]
+    money = lambda value: f"{value:,}".replace(",", " ")
+    gap = request.budget_kzt - provider.price_from_kzt
+    price = f"цена от {money(provider.price_from_kzt)} ₸"
+    price += f" — на {money(gap)} ₸ ниже лимита {money(request.budget_kzt)} ₸" if gap else " совпадает с вашим лимитом"
+    details.append(price)
+    if request.duration_hours is not None:
+        hours = str(request.duration_hours).removesuffix(".0").replace(".", ",")
+        if provider.max_hours is not None:
+            details.append(f"лимит {provider.max_hours} ч покрывает запрос на {hours} ч")
+        else:
+            details.append("услуга не привязана к часам присутствия, сроки выполнения нужно согласовать")
+    details.append("итоговую стоимость нужно уточнить")
     return {
         "id": provider.id,
         "name": provider.name,
@@ -164,6 +239,14 @@ def _card(provider: Provider, request: RecommendationRequest) -> dict:
         "price_imputed": provider.price_imputed,
         "explanation": first_sentence + " " + "; ".join(details) + ".",
     }
+
+
+def explanation_with_evidence(provider: Provider, request: RecommendationRequest, evidence: str) -> str:
+    """Render a caller-verified source excerpt; hard facts still come from the engine."""
+    canonical = _canonical_request(normalize_request(request), [provider])
+    if evidence not in description_evidence(provider.description):
+        evidence = _relevant_evidence(provider, canonical)
+    return _card(provider, canonical, description_signal=evidence)["explanation"]
 
 
 def _reason_sentence(counts: Counter[str]) -> str:
@@ -178,15 +261,61 @@ def _reason_sentence(counts: Counter[str]) -> str:
     return "; ".join(parts) + "." if parts else ""
 
 
+def _profile_count(count: int) -> str:
+    suffix = "профилей" if 11 <= count % 100 <= 14 else (
+        "профиль" if count % 10 == 1 else "профиля" if count % 10 in (2, 3, 4) else "профилей"
+    )
+    return f"{count} {suffix}"
+
+
+def _no_match_message(rejections: list[tuple[Provider, set[str]]], request: RecommendationRequest,
+                      counts: Counter[str]) -> str:
+    messages = []
+    for reason in REASON_ORDER:
+        group = [p for p, reasons in rejections if reasons == {reason}]
+        if not group:
+            continue
+        count = len(group)
+        singular = count % 10 == 1 and count % 100 != 11
+        intro = f"По остальным условиям {'подходит' if singular else 'подходят'} {_profile_count(count)}, но "
+        if reason == "busy":
+            detail = f"{'он занят' if singular else 'все они заняты'} на {request.event_date}"
+        elif reason == "budget":
+            minimum = f"{min(p.price_from_kzt for p in group):,}".replace(",", " ")
+            budget = f"{request.budget_kzt:,}".replace(",", " ")
+            detail = f"цена от {minimum} ₸ выше бюджета {budget} ₸"
+        elif reason == "format":
+            detail = f"{'он не берёт' if singular else 'они не берут'} формат «{request.event_format}»"
+        elif reason == "duration":
+            detail = "доступная длительность меньше запрошенной"
+        else:
+            detail = f"язык «{request.language}» не указан в профиле" if singular else f"язык «{request.language}» не указан в профилях"
+        messages.append(intro + detail + ".")
+    if messages:
+        advice = []
+        if any(reasons == {"busy"} for _, reasons in rejections):
+            advice.append("проверить другую дату")
+        if any(reasons == {"budget"} for _, reasons in rejections):
+            advice.append("увеличить бюджет до указанной стартовой цены")
+        if advice:
+            messages.append("Можно " + " или ".join(advice) + "; после изменения условий нужен новый подбор.")
+        return " ".join(messages)
+    return (f"В выбранном городе найдено профилей этой категории: {len(rejections)}, "
+            f"но каждый не проходит несколько условий. Причины могут пересекаться: {_reason_sentence(counts)}")
+
+
 def recommend(
     providers: Iterable[Provider], request: RecommendationRequest
 ) -> dict:
     """Return one of the three user-visible outcomes required by the brief."""
     request = normalize_request(request)
+    providers = list(providers)
+    request = _canonical_request(request, providers)
     scoped = [
         provider
         for provider in providers
-        if provider.city == request.city and request.category in provider.categories
+        if _text_key(provider.city) == _text_key(request.city)
+        and _text_key(request.category) in {_text_key(v) for v in provider.categories}
     ]
     if not scoped:
         return {
@@ -198,9 +327,11 @@ def recommend(
 
     rejected: Counter[str] = Counter()
     eligible: list[Provider] = []
+    rejections: list[tuple[Provider, set[str]]] = []
     for provider in scoped:
         reasons = _rejection_reasons(provider, request)
         if reasons:
+            rejections.append((provider, reasons))
             rejected.update(key for key in REASON_ORDER if key in reasons)
         else:
             eligible.append(provider)
@@ -209,10 +340,7 @@ def recommend(
         return {
             "outcome": "no_match",
             "cards": [],
-            "message": (
-                f"В каталоге есть {len(scoped)} подрядчик(а) этой категории, "
-                f"но никто не проходит условия: {_reason_sentence(rejected)}"
-            ),
+            "message": _no_match_message(rejections, request, rejected),
             "stats": {"catalog_candidates": len(scoped), "eligible": 0, "rejected": dict(rejected)},
         }
 
@@ -221,12 +349,26 @@ def recommend(
     ranked = sorted(eligible, key=lambda provider: (provider.price_from_kzt, provider.id))
     cards = [_card(provider, request) for provider in ranked[:3]]
     message = f"Подобрано {len(cards)} из {len(eligible)} подходящих подрядчиков."
+    if len(cards) > 1:
+        message += " Порядок — по возрастанию цены «от», а не по оценке качества; при равной цене — по ID."
+    otherwise_busy = sum(reasons == {"busy"} for _, reasons in rejections)
+    if otherwise_busy:
+        message += f" Ещё {_profile_count(otherwise_busy)} не показано из-за занятости на {request.event_date}; остальные условия выполнены."
     if len(eligible) < 3:
         rejected_message = _reason_sentence(rejected)
         if rejected_message:
             message += f" Меньше трёх, потому что {rejected_message}"
         else:
             message += " Меньше трёх, потому что в этой категории всего столько доступных профилей."
+    # Never invent distinctions merely to satisfy an explanation-uniqueness test.
+    masked = []
+    for card in cards:
+        text = card["explanation"]
+        for candidate in cards:
+            text = re.sub(re.escape(candidate["name"]), "[имя]", text, flags=re.IGNORECASE)
+        masked.append(text)
+    if len(set(masked)) < len(masked):
+        message += " У части карточек совпадают описанные условия и особенности: данных каталога недостаточно, чтобы обоснованно различить их."
 
     return {
         "outcome": "matches",
