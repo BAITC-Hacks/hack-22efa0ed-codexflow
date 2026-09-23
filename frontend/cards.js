@@ -20,8 +20,10 @@ export function renderSkeletons(container, loading = false) {
   container.replaceChildren();
   container.classList.add('has-cards', 'skeleton-state');
   container.classList.toggle('is-loading', loading);
-  container.append(element('h3', 'skeleton-heading', loading ? 'Подбираем вашу команду' : 'Здесь появится ваша подборка'));
-  container.append(element('p', 'skeleton-caption', loading ? 'Проверяем условия и готовим объяснение для каждого варианта.' : 'Заполните форму — покажем до трёх вариантов и объясним, почему они подходят.'));
+  const illustration = element('div', 'state-illustration', '✳'); illustration.setAttribute('aria-hidden', 'true');
+  container.append(illustration);
+  container.append(element('h3', 'skeleton-heading', loading ? 'Подбираем вашу команду' : 'Хорошая команда начинается здесь'));
+  container.append(element('p', 'skeleton-caption', loading ? 'Проверяем условия и готовим объяснение для каждого варианта.' : 'Расскажите о вашем событии слева. Мы найдём совпадения по условиям и покажем, чем интересен каждый вариант.'));
   const grid = element('div', 'skeleton-preview'); grid.setAttribute('aria-hidden', 'true');
   for (let i = 0; i < 3; i++) {
     const card = element('div', 'skeleton-card');
@@ -42,13 +44,14 @@ export function renderRecommendations(container, data) {
     const top = element('div', 'card-top');
     top.append(categoryBadge(item.categories), element('span', 'rank', `0${index + 1}`));
     card.append(top, element('h3', '', item.name));
-    card.append(element('p', 'card-meta', `${item.city} · от ${new Intl.NumberFormat('ru-RU').format(item.price_from_kzt)} ₸`));
+    const details = element('div', 'card-details');
+    details.append(element('span', 'card-location', item.city), element('span', 'card-price', `от ${new Intl.NumberFormat('ru-RU').format(item.price_from_kzt)} ₸`));
     const reason = element('div', 'reason');
     const reasonLabel = element('span', 'reason-label');
     const star = element('span', 'reason-star', '✳'); star.setAttribute('aria-hidden', 'true');
     reasonLabel.append(star, document.createTextNode(' Почему подходит'));
     reason.append(reasonLabel, element('p', '', item.explanation));
-    card.append(reason);
+    card.append(reason, details);
     if (typeof item.caveats === 'string' && item.caveats.trim()) {
       const caveat = element('aside', 'caveat');
       const heading = element('strong', 'caveat-heading');
@@ -61,7 +64,7 @@ export function renderRecommendations(container, data) {
     if (item.price_imputed) provenance.push('Цена проставлена при подготовке датасета');
     if (item.city_imputed) provenance.push('Город проставлен при подготовке датасета');
     if (provenance.length) card.append(element('p', 'provenance', provenance.join(' · ')));
-    const action = element('button', 'card-action', 'Связаться'); action.type = 'button';
+    const action = element('button', 'card-action', 'Связаться ↗'); action.type = 'button';
     const availability = element('p', 'availability-note', 'Доступно в полной версии. Сейчас сервис помогает подобрать подрядчика.');
     availability.id = `availability-${index}`; availability.hidden = true; availability.setAttribute('role', 'status');
     action.setAttribute('aria-expanded', 'false'); action.setAttribute('aria-controls', availability.id);

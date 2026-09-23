@@ -33,6 +33,7 @@ function setError(name, message) {
   if (!names.includes(name)) return;
   document.getElementById(`${name}-error`).textContent = message;
   form.elements[name].setAttribute('aria-invalid', String(Boolean(message)));
+  if (message && form.elements[name].closest('details')) form.elements[name].closest('details').open = true;
 }
 function clearErrors() { names.forEach(name => setError(name, '')); }
 function validate() {
@@ -58,10 +59,17 @@ function validate() {
     language: values.language || null,
   };
 }
-function message(container, title, text) {
+function message(container, title, text, error = false) {
+  container.classList.add('message-state');
+  const icon = document.createElement('div'); icon.className = 'state-illustration'; icon.textContent = error ? '↺' : '✳'; icon.setAttribute('aria-hidden', 'true');
+  container.append(icon);
   const heading = document.createElement('h3'); heading.textContent = title;
   const paragraph = document.createElement('p'); paragraph.textContent = text;
   container.append(heading, paragraph);
+  if (!error) container.append(button('Изменить пожелания', () => {
+    form.elements.category.focus();
+    form.elements.category.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+  }));
 }
 async function showResult(render, animate = false) {
   const previous = result.querySelector('.result-view');
@@ -91,6 +99,7 @@ function markStale() { stale.hidden = !hasResult || formKey() === lastSubmittedK
 function fillExample(key) {
   const values = MOCK_REQUESTS[key] || MOCK_REQUESTS.success;
   for (const name of names) form.elements[name].value = values[name] ?? '';
+  form.querySelector('.preferences').open = Boolean(values.language || values.duration_hours);
   clearErrors(); markStale(); formState.changed();
 }
 async function submit(request) {
@@ -104,7 +113,7 @@ async function submit(request) {
     shown.language, shown.duration_hours ? `${shown.duration_hours} ч` : null].filter(Boolean).join(' · ');
   status.textContent = 'Подбираем подрядчиков.';
   result.setAttribute('aria-busy', 'true');
-  showResult(view => renderSkeletons(view, true));
+  await showResult(view => renderSkeletons(view, true), true);
   let invalidField;
   try {
     const data = await recommend(p, request.scenario);
@@ -118,7 +127,7 @@ async function submit(request) {
       if (names.includes(name)) { setError(name, text); invalidField ||= name; }
     }
     await showResult(view => {
-      message(view, 'Не удалось получить подборку', error.message);
+      message(view, 'Попробуем ещё раз?', error.message, true);
       if (!invalidField) view.append(button('Повторить', () => submit(request)));
     }, true);
   } finally {
@@ -140,8 +149,8 @@ async function loadFilters() {
   try {
     filters = await getFilters();
     options('city', filters.cities, 'Выберите город');
-    options('event_format', filters.event_formats, 'Выберите формат');
-    options('category', filters.categories, 'Выберите категорию');
+    options('event_format', filters.event_formats, 'Какой у вас повод?');
+    options('category', filters.categories, 'Выберите специалиста');
     options('language', filters.languages, 'Любой');
     const minimum = MOCK_MODE ? filters.event_date_range.min : [today(), filters.event_date_range.min].sort().at(-1);
     form.elements.event_date.min = minimum; form.elements.event_date.max = filters.event_date_range.max;

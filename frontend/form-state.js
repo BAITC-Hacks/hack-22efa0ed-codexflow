@@ -1,3 +1,5 @@
+import { MOCK_REQUESTS } from './mocks.js';
+
 const currency = value => `${new Intl.NumberFormat('ru-RU').format(value)} ₸`;
 
 export function createFormState(form, names, mockMode, scenario) {
@@ -15,6 +17,11 @@ export function createFormState(form, names, mockMode, scenario) {
     const completed = required.filter(field => field.value.trim() && field.validity.valid && field.getAttribute('aria-invalid') !== 'true').length;
     progress.max = required.length;
     progress.value = completed;
+    document.querySelectorAll('[data-example]').forEach(chip => {
+      const preset = MOCK_REQUESTS[chip.dataset.example];
+      const selected = preset && names.every(name => form.elements[name].value === String(preset[name] ?? ''));
+      chip.setAttribute('aria-pressed', String(selected));
+    });
     progressText.textContent = `${completed} из ${required.length} заполнено`;
     progress.setAttribute('aria-valuetext', progressText.textContent);
     const amount = Number(budget.value);
@@ -49,6 +56,7 @@ export function createFormState(form, names, mockMode, scenario) {
       }
       if (mockMode && [...scenario.options].some(option => option.value === draft.scenario)) scenario.value = draft.scenario;
       if (restored) draftStatus.textContent = 'Черновик восстановлен на этом устройстве';
+      if (form.elements.duration_hours.value || form.elements.language.value) form.querySelector('.preferences').open = true;
       refresh();
       return restored;
     } catch {
