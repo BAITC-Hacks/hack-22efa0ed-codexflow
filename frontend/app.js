@@ -1,3 +1,4 @@
+import { initializeMotion } from './motion.js';
 import { MOCK_MODE } from './config.js';
 import { getFilters, recommend } from './api.js';
 import { renderRecommendations, renderSkeletons } from './cards.js';
@@ -218,3 +219,4 @@ form.querySelectorAll('[data-example]').forEach(node => node.addEventListener('c
 }));
 showResult(view => renderSkeletons(view));
 loadFilters();
+initializeMotion();

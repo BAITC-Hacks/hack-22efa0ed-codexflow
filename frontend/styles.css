@@ -1286,3 +1286,51 @@ button:active:not(:disabled) {
     scroll-behavior:auto!important;
   }
 }
+
+/* Gentle entrance and interaction feedback, without decorative imagery. */
+@media (prefers-reduced-motion: no-preference) {
+  .intro > div:first-child { animation: card-arrive 360ms ease-out both; }
+  .scroll-reveal { transition: opacity 320ms ease-out, transform 320ms ease-out; }
+  .reveal-pending { opacity: 0; transform: translateY(12px); }
+  .card { transition: box-shadow 220ms ease-out, border-color 220ms ease-out; }
+  .primary .button-arrow { transition: transform 180ms ease-out; }
+}
+@media (hover:hover) {
+  .card:hover { box-shadow: 0 12px 30px #243c6012; border-color: #cdd9f3; }
+  .primary:hover:not(:disabled) .button-arrow { transform: translate(2px,-2px); }
+}
+@media (prefers-reduced-motion:reduce) { .reveal-pending { opacity: 1; transform: none; } }
+
+/* Decorative numbers refer to the maximum three recommendations, not a score. */
+.number-motion { width: 230px; flex: 0 0 230px; text-align: center; }
+.number-orbit { position: relative; width: 170px; height: 170px; margin: 0 auto; }
+.orbit-center { position: absolute; inset: 35px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #65718a; font-size: 11px; line-height: 1.2; }
+.orbit-center strong { color: var(--accent); font-size: 44px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.orbit-center small { font-size: 11px; margin-top: 4px; }
+.orbit-track { position: absolute; inset: 14px; border: 1px solid #dce4f6; border-radius: 50%; }
+.orbit-number { position: absolute; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; box-shadow: 0 3px 10px #243c6010; }
+.orbit-number > span { display: block; }
+.number-one { top: -21px; left: calc(50% - 21px); background: #3358df; color: white; }
+.number-two { right: -12px; bottom: 13px; background: #e0ece9; color: #406b5f; }
+.number-three { left: -12px; bottom: 13px; background: #f8e8db; color: #886349; }
+#number-motion-toggle { min-height: 36px; margin-top: 12px; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; font-size: 11px; color: var(--muted); }
+#number-motion-toggle:hover { background: #eaf0ff; color: var(--accent); }
+@media (prefers-reduced-motion:no-preference) {
+  .orbit-track { animation: orbit-turn 18s linear infinite; }
+  .orbit-number > span { animation: orbit-counterturn 18s linear infinite; }
+}
+.number-motion[data-paused=true] .orbit-track, .number-motion[data-paused=true] .orbit-number > span { animation-play-state: paused; }
+@keyframes orbit-turn { to { transform: rotate(360deg); } }
+@keyframes orbit-counterturn { to { transform: rotate(-360deg); } }
+@media (max-width:720px) { .number-motion { width: 150px; flex-basis: 150px; } .number-orbit { transform: scale(.8); transform-origin: top center; height: 142px; width: 170px; margin-left: -10px; } #number-motion-toggle { max-width: 150px; margin-top: 0; } }
+@media (max-width:540px) { .intro { flex-wrap: wrap; } .number-motion { margin: 4px auto 0; } }
+
+.event-marquee { overflow: hidden; border-top: 1px solid #e1e7f3; border-bottom: 1px solid #e1e7f3; padding: 16px 0; margin: 0 0 28px; background: #eef3ff; border-radius: 10px; }
+.marquee-track { display: flex; width: max-content; }
+.marquee-group { display: flex; flex-shrink: 0; align-items: center; gap: 28px; padding-right: 28px; }
+.marquee-group > span { white-space: nowrap; font-size: 15px; font-weight: 500; color: #536eaa; }
+.marquee-group b { color: #9aacd5; font-size: 12px; padding-left: 28px; font-weight: 400; }
+@media (prefers-reduced-motion:no-preference) { .marquee-track { animation: text-drift 32s linear infinite; } }
+.event-marquee:hover .marquee-track, body[data-motion-paused=true] .marquee-track { animation-play-state: paused; }
+@keyframes text-drift { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion:reduce) { .marquee-group:nth-child(2) { display: none; } .marquee-track { width: 100%; } .marquee-group { flex-wrap: wrap; justify-content: center; padding: 0 16px; gap: 12px; } .marquee-group b { padding-left: 12px; } }
