@@ -206,7 +206,7 @@ def assistant_turn(providers: Iterable[Provider], message: str,
             return {"reply": "Календарь доступности в каталоге покрывает даты с 23.09.2026 по 31.12.2026. "
                             "Назовите дату в этом диапазоне.",
                     "context": state, "complete": False, "recommendation": None}
-    if state.get("budget_kzt") is None and re.search(r"(бюджет|лимит)", _norm(text)) and re.search(r"\b0\b", text):
+    if invalid_budget:
         return {"reply": "Бюджет должен быть больше нуля. Какую максимальную сумму в тенге заложить?",
                 "context": state, "complete": False, "recommendation": None}
 
