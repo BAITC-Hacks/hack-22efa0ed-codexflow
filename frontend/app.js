@@ -24,6 +24,25 @@ modeLink.textContent = MOCK_MODE ? 'Перейти к сервису' : 'Отк�
 modeLink.href = MOCK_MODE ? '?demo=0' : '?demo=1';
 document.querySelector('#demo').hidden = !MOCK_MODE;
 
+const editSearch = document.querySelector('#edit-search');
+const searchRecap = document.querySelector('#search-recap');
+function expandSearch(focus = true) {
+  fields.hidden = false;
+  form.classList.remove('is-compact');
+  editSearch.hidden = true; searchRecap.hidden = true;
+  if (focus) {
+    form.elements.category.focus();
+    form.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+  }
+}
+function collapseSearch() {
+  fields.hidden = true;
+  form.classList.add('is-compact');
+  searchRecap.textContent = summary.textContent;
+  searchRecap.hidden = false; editSearch.hidden = false;
+}
+editSearch.addEventListener('click', () => expandSearch());
+
 function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -51,7 +70,7 @@ function validate() {
   if (!errors.event_date && (values.event_date < minimum || values.event_date > filters.event_date_range.max)) errors.event_date = `Выберите дату с ${displayDate(minimum)} по ${displayDate(filters.event_date_range.max)}.`;
   for (const name of names) setError(name, errors[name] || '');
   formState.refresh();
-  if (Object.keys(errors).length) { form.elements[Object.keys(errors)[0]].focus(); return null; }
+  if (Object.keys(errors).length) { expandSearch(false); form.elements[Object.keys(errors)[0]].focus(); return null; }
   return {
     city: values.city, event_date: values.event_date, event_format: values.event_format,
     category: values.category, budget_kzt: Number(values.budget_kzt),
@@ -67,8 +86,7 @@ function message(container, title, text, error = false) {
   const paragraph = document.createElement('p'); paragraph.textContent = text;
   container.append(heading, paragraph);
   if (!error) container.append(button('Изменить пожелания', () => {
-    form.elements.category.focus();
-    form.elements.category.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+    expandSearch();
   }));
 }
 async function showResult(render, animate = false) {
@@ -97,6 +115,7 @@ function button(label, action) {
 }
 function markStale() { stale.hidden = !hasResult || formKey() === lastSubmittedKey; }
 function fillExample(key) {
+  expandSearch(false);
   const values = MOCK_REQUESTS[key] || MOCK_REQUESTS.success;
   for (const name of names) form.elements[name].value = values[name] ?? '';
   form.querySelector('.preferences').open = Boolean(values.language || values.duration_hours);
@@ -105,6 +124,9 @@ function fillExample(key) {
 async function submit(request) {
   if (pending) return;
   pending = true; fields.disabled = true; scenario.disabled = true;
+  editSearch.disabled = true;
+  const submitLabel = form.querySelector('.primary > span');
+  submitLabel.textContent = 'Подбираем варианты…';
   stale.hidden = true; summary.hidden = false;
   const p = request.payload;
   const shown = MOCK_MODE ? MOCK_REQUESTS[request.scenario] || MOCK_REQUESTS.success : p;
@@ -120,6 +142,7 @@ async function submit(request) {
     if (data.outcome === 'matches') await showResult(view => renderRecommendations(view, data), true);
     else await showResult(view => message(view, data.outcome === 'category_absent' ? 'В городе нет этой категории' : 'Нет подходящих вариантов', data.message), true);
     status.textContent = data.message;
+    collapseSearch();
   } catch (error) {
     status.textContent = error.message;
     clearErrors();
@@ -132,11 +155,16 @@ async function submit(request) {
     }, true);
   } finally {
     pending = false; fields.disabled = false; scenario.disabled = false;
+    editSearch.disabled = false;
+    form.querySelector('.primary > span').textContent = 'Подобрать подрядчиков';
     result.setAttribute('aria-busy', 'false'); hasResult = true;
     formState.refresh();
     lastSubmittedKey = request.key; markStale();
-    if (invalidField) form.elements[invalidField].focus();
-    else document.querySelector('#results-title').focus({ preventScroll: true });
+    if (invalidField) { expandSearch(false); form.elements[invalidField].focus(); }
+    else {
+      document.querySelector('#results-title').focus({ preventScroll: true });
+      document.querySelector('.results').scrollIntoView?.({ block: 'start', behavior: 'auto' });
+    }
   }
 }
 function options(name, values, placeholder) {

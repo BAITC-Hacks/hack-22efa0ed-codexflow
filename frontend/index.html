@@ -9,18 +9,19 @@
   <script type="module" src="./app.js"></script>
 </head>
 <body>
-  <header class="site-header"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">✳</span>повод<span class="brand-dot">.</span></a><span class="header-note">Маленький шаг к большому событию</span><a id="mode-link" href="?demo=1">Открыть демо</a></header>
+  <a class="skip-link" href="#order-form">Перейти к подбору</a>
+  <header class="site-header"><a class="brand" href="./"><span class="brand-mark" aria-hidden="true">п</span>повод<span class="brand-dot">/</span></a><span class="header-note">Подрядчики для ваших событий</span><a id="mode-link" href="?demo=1">Открыть демо</a></header>
   <main>
-    <section class="intro"><div><p class="eyebrow">СОБЫТИЯ НАЧИНАЮТСЯ С ЛЮДЕЙ</p><h1>Ваш повод.<br>Подходящие <em>люди.</em></h1></div><div class="intro-aside"><span class="intro-star" aria-hidden="true">✳</span><p>Расскажите, что вы задумали.<br>Мы предложим до трёх подрядчиков<br>и объясним каждый выбор.</p><span class="intro-footnote">По вашим условиям · Из каталога Казахстана</span></div></section>
+    <section class="intro"><div><p class="eyebrow">МЕНЬШЕ ПОИСКА. БОЛЬШЕ СОВПАДЕНИЙ.</p><h1>Найдите своих людей<br>для вашего события<span>.</span></h1><p class="intro-description">До трёх подходящих подрядчиков. С понятным объяснением каждого выбора.</p></div><div class="intro-stamp"><span aria-hidden="true">↗</span><p>Ваши условия.<br>Обоснованный выбор.</p></div></section>
     <aside id="demo" hidden><span class="demo-icon" aria-hidden="true">ⓘ</span><div class="demo-content"><strong>Вы в демонстрационном режиме</strong><p>Здесь показаны готовые примеры. Чтобы подобрать людей под свои условия, перейдите к сервису.</p><label for="scenario">Посмотреть сценарий</label><select id="scenario"><option value="success">Три рекомендации</option><option value="rare">Редкая категория — два варианта</option><option value="no_category">В городе нет категории</option><option value="no_match">Никто не проходит по бюджету</option><option value="error">Ошибка соединения</option></select></div></aside>
     <div class="layout">
       <form id="order-form" novalidate>
-        <div class="form-heading"><span class="step">01</span><div><h2>Ваше мероприятие</h2><p>Начнём с того, что для вас важно.</p></div></div>
+        <div class="search-header"><div class="form-heading"><span class="step">01</span><div><h2>Расскажите о событии</h2><p>Пять основных параметров — и можно выбирать.</p></div></div><button id="edit-search" type="button" aria-controls="fields" aria-expanded="false" hidden>Изменить параметры <span aria-hidden="true">↗</span></button></div><p id="search-recap" hidden></p>
         <div class="form-completion"><label id="progress-text" for="form-progress">0 из 5 заполнено</label><progress id="form-progress" max="5" value="0"></progress></div>
         <div id="filters-status" role="status">Готовим варианты для вашей формы…</div>
         <fieldset id="fields" disabled>
           <div class="examples" aria-label="Примеры запросов"><span>Можно начать с примера</span><div class="example-options"><button type="button" data-example="success" aria-pressed="false">Ведущий <span aria-hidden="true">↗</span></button><button type="button" data-example="rare" aria-pressed="false">Флорист <span aria-hidden="true">✿</span></button><button type="button" data-example="no_match" aria-pressed="false">Низкий бюджет</button></div></div>
-          <section class="form-group" aria-labelledby="event-group"><h3 id="event-group">Что вы планируете?</h3><div class="pair">
+          <div class="search-grid"><section class="form-group" aria-labelledby="event-group"><h3 id="event-group">Что вы планируете?</h3><div class="pair">
             <div class="field"><label for="event_format">Формат события <span>*</span></label><select id="event_format" name="event_format" required aria-describedby="event_format-error"></select><span class="error" id="event_format-error"></span></div>
             <div class="field"><label for="category">Кого ищем? <span>*</span></label><select id="category" name="category" required aria-describedby="category-error"></select><span class="error" id="category-error"></span></div>
           </div></section>
@@ -28,20 +29,20 @@
             <div class="field"><label for="city">Город <span>*</span></label><select id="city" name="city" required aria-describedby="city-error"></select><span class="error" id="city-error"></span></div>
             <div class="field"><label for="event_date">Дата <span>*</span></label><input id="event_date" name="event_date" type="date" required aria-describedby="date-help event_date-error"><span class="error" id="event_date-error"></span></div>
           </div><small id="date-help"></small></section>
-          <section class="form-group budget-group" aria-labelledby="budget-group"><h3 id="budget-group">Комфортный для вас бюджет</h3><div class="field budget-field"><div class="budget-heading"><label for="budget_kzt">До какой суммы, ₸ <span>*</span></label><output id="budget-value" for="budget_kzt budget-slider">Бюджет не задан</output></div>
+          <section class="form-group budget-group" aria-labelledby="budget-group"><h3 id="budget-group">Комфортный для вас бюджет</h3><div class="field budget-field"><div class="budget-heading"><label for="budget_kzt">До какой суммы, ₸ <span>*</span></label><output id="budget-value" for="budget_kzt budget-slider">Укажите сумму</output></div>
             <label class="sr-only" for="budget-slider">Верхний предел бюджета, тенге</label><input id="budget-slider" type="range" min="1" max="5000000" step="1" value="1" aria-describedby="budget-help"><div class="range-labels" aria-hidden="true"><span>1 ₸</span><span id="budget-slider-max">5 000 000 ₸</span></div>
-            <input id="budget_kzt" name="budget_kzt" type="number" min="1" step="1" placeholder="Например, 500 000" required aria-describedby="budget-help budget_kzt-error"><small id="budget-help">Передвиньте ползунок или укажите точную сумму.</small><span class="error" id="budget_kzt-error"></span></div></section>
-          <details class="preferences"><summary><span>Ещё пара пожеланий <small>необязательно</small></span><span class="details-plus" aria-hidden="true">+</span></summary><div class="pair">
+            <input id="budget_kzt" name="budget_kzt" type="number" min="1" step="1" placeholder="Например, 500 000" required aria-describedby="budget-help budget_kzt-error"><small id="budget-help">Передвиньте ползунок или укажите точную сумму.</small><span class="error" id="budget_kzt-error"></span></div></section></div>
+          <div class="search-bottom"><details class="preferences"><summary><span>Ещё пара пожеланий <small>необязательно</small></span><span class="details-plus" aria-hidden="true">+</span></summary><div class="pair">
             <div class="field"><label for="duration_hours">На сколько часов?</label><input id="duration_hours" name="duration_hours" type="number" min="0.1" step="any" placeholder="Например, 4.5" aria-describedby="duration_hours-error"><span class="error" id="duration_hours-error"></span></div>
             <div class="field"><label for="language">Язык общения</label><select id="language" name="language" aria-describedby="language-error"></select><span class="error" id="language-error"></span></div>
           </div></details>
-          <div class="form-action"><button class="primary" type="submit"><span>Подобрать подрядчиков</span><span class="button-arrow" aria-hidden="true">↗</span></button><p class="submit-note">Только рекомендации. Никаких заявок и обязательств.</p></div>
+          <div class="form-action"><button class="primary" type="submit"><span>Подобрать подрядчиков</span><span class="button-arrow" aria-hidden="true">↗</span></button><p class="submit-note">Только рекомендации. Никаких заявок и обязательств.</p></div></div>
         </fieldset>
         <div class="form-footer"><span class="hint">* Нужны для подбора</span><span id="draft-status" class="draft-status" role="status"></span></div>
       </form>
-      <section class="results" aria-labelledby="results-title"><div class="results-heading"><div class="section-title"><span class="step">02</span><div><h2 id="results-title" tabindex="-1">Ваша подборка</h2><p>Важен не список. Важно — почему именно они.</p></div></div><span class="results-mark" aria-hidden="true">✳</span></div><p id="request-summary" hidden></p><p id="stale-notice" hidden>Вы изменили пожелания. Обновите подборку, чтобы увидеть подходящие варианты.</p><div id="request-status" class="sr-only" role="status"></div><div id="result"></div></section>
+      <section class="results" aria-labelledby="results-title"><div class="results-heading"><div class="section-title"><span class="step">02</span><div><h2 id="results-title" tabindex="-1">Ваша подборка</h2><p>Сравните условия и причины, по которым подходит каждый вариант.</p></div></div><span class="results-mark">ДО 3 ВАРИАНТОВ</span></div><p id="request-summary" hidden></p><p id="stale-notice" hidden>Вы изменили пожелания. Обновите подборку, чтобы увидеть подходящие варианты.</p><div id="request-status" class="sr-only" role="status"></div><div id="result"></div></section>
     </div>
-    <footer><a class="footer-brand" href="./">повод.</a><p>Люди для событий, которые хочется запомнить.</p><span>Условия работы уточняются у подрядчика.</span></footer>
+    <footer><a class="footer-brand" href="./">повод.</a><p>Хороший выбор начинается с понятных причин.</p><span>Условия работы уточняются у подрядчика.</span></footer>
     <noscript>Включите JavaScript, чтобы заполнить форму и получить подборку.</noscript>
   </main>
 </body>

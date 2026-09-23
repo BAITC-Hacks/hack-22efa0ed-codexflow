@@ -20,10 +20,10 @@ export function renderSkeletons(container, loading = false) {
   container.replaceChildren();
   container.classList.add('has-cards', 'skeleton-state');
   container.classList.toggle('is-loading', loading);
-  const illustration = element('div', 'state-illustration', '✳'); illustration.setAttribute('aria-hidden', 'true');
+  const illustration = element('div', 'state-illustration', '↗'); illustration.setAttribute('aria-hidden', 'true');
   container.append(illustration);
-  container.append(element('h3', 'skeleton-heading', loading ? 'Подбираем вашу команду' : 'Хорошая команда начинается здесь'));
-  container.append(element('p', 'skeleton-caption', loading ? 'Проверяем условия и готовим объяснение для каждого варианта.' : 'Расскажите о вашем событии слева. Мы найдём совпадения по условиям и покажем, чем интересен каждый вариант.'));
+  container.append(element('h3', 'skeleton-heading', loading ? 'Подбираем вашу команду' : 'Ваша следующая хорошая команда'));
+  container.append(element('p', 'skeleton-caption', loading ? 'Проверяем условия и готовим объяснение для каждого варианта.' : 'Укажите параметры выше. Здесь появятся до трёх вариантов — каждый с объяснением, ценой и важными деталями.'));
   const grid = element('div', 'skeleton-preview'); grid.setAttribute('aria-hidden', 'true');
   for (let i = 0; i < 3; i++) {
     const card = element('div', 'skeleton-card');
@@ -41,6 +41,12 @@ export function renderRecommendations(container, data) {
   data.cards.forEach((item, index) => {
     const card = element('article', 'card');
     card.style.setProperty('--card-delay', `${index * 120}ms`);
+    const visual = element('div', 'card-visual');
+    const emblem = element('span', 'card-emblem', item.categories.some(value => ['Флорист', 'Декоратор'].includes(value)) ? '✿' : item.categories.some(value => ['Фотограф', 'Видеограф'].includes(value)) ? '◉' : '✦');
+    emblem.setAttribute('aria-hidden', 'true');
+    visual.append(emblem);
+    visual.dataset.variant = String(index % 3);
+    card.append(visual);
     const top = element('div', 'card-top');
     top.append(categoryBadge(item.categories), element('span', 'rank', `0${index + 1}`));
     card.append(top, element('h3', '', item.name));
@@ -48,7 +54,7 @@ export function renderRecommendations(container, data) {
     details.append(element('span', 'card-location', item.city), element('span', 'card-price', `от ${new Intl.NumberFormat('ru-RU').format(item.price_from_kzt)} ₸`));
     const reason = element('div', 'reason');
     const reasonLabel = element('span', 'reason-label');
-    const star = element('span', 'reason-star', '✳'); star.setAttribute('aria-hidden', 'true');
+    const star = element('span', 'reason-star', '✓'); star.setAttribute('aria-hidden', 'true');
     reasonLabel.append(star, document.createTextNode(' Почему подходит'));
     reason.append(reasonLabel, element('p', '', item.explanation));
     card.append(reason, details);
