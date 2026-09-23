@@ -9,7 +9,7 @@ class HandoffContractTests(unittest.TestCase):
     def test_all_shared_demo_fixtures_match_api(self):
         with TestClient(app) as client:
             cases = json.loads(CASES_PATH.read_text(encoding='utf-8'))
-            self.assertEqual(len(cases), 6)
+            self.assertEqual(len(cases), 7)
             for case in cases:
                 with self.subTest(case=case['name']):
                     response = client.post('/recommendations', json=case['request'])
