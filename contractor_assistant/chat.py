@@ -64,7 +64,7 @@ def _parse_date(text: str) -> str | None:
 
 def _parse_budget(text: str) -> int | None:
     pattern = re.compile(
-        r"(?<!\w)(\d{1,3}(?:[ \u00a0]\d{3})+|\d{1,9}(?:[.,]\d+)?)"
+        r"(?<!\w)([+-]?\d{1,3}(?:[ \u00a0]\d{3})+|[+-]?\d{1,9}(?:[.,]\d+)?)"
         r"\s*(млн(?:ов)?|миллион(?:а|ов)?|тыс(?:яч[а-я]*)?\.?|тысяч[а-я]*|к|k|₸|тг|тенге)?",
         re.IGNORECASE,
     )
