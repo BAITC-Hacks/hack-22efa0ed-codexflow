@@ -1,7 +1,8 @@
 import { MOCK_MODE } from './config.js';
 import { getFilters, recommend } from './api.js';
-import { renderRecommendations } from './cards.js';
+import { renderRecommendations, renderSkeletons } from './cards.js';
 import { MOCK_REQUESTS } from './mocks.js';
+import { createFormState } from './form-state.js';
 
 const form = document.querySelector('#order-form');
 const result = document.querySelector('#result');
@@ -12,6 +13,7 @@ const status = document.querySelector('#request-status');
 const summary = document.querySelector('#request-summary');
 const stale = document.querySelector('#stale-notice');
 const names = ['event_format', 'category', 'city', 'event_date', 'budget_kzt', 'duration_hours', 'language'];
+const formState = createFormState(form, names, MOCK_MODE, scenario);
 let pending = false;
 let filters;
 let hasResult = false;
@@ -47,6 +49,7 @@ function validate() {
   if (!errors.event_date && (!/^\d{4}-\d{2}-\d{2}$/.test(values.event_date) || !Number.isFinite(Date.parse(values.event_date)))) errors.event_date = 'Укажите корректную дату.';
   if (!errors.event_date && (values.event_date < minimum || values.event_date > filters.event_date_range.max)) errors.event_date = `Выберите дату с ${displayDate(minimum)} по ${displayDate(filters.event_date_range.max)}.`;
   for (const name of names) setError(name, errors[name] || '');
+  formState.refresh();
   if (Object.keys(errors).length) { form.elements[Object.keys(errors)[0]].focus(); return null; }
   return {
     city: values.city, event_date: values.event_date, event_format: values.event_format,
@@ -55,11 +58,30 @@ function validate() {
     language: values.language || null,
   };
 }
-function message(title, text) {
-  result.classList.remove('has-cards'); result.replaceChildren();
+function message(container, title, text) {
   const heading = document.createElement('h3'); heading.textContent = title;
   const paragraph = document.createElement('p'); paragraph.textContent = text;
-  result.append(heading, paragraph);
+  container.append(heading, paragraph);
+}
+async function showResult(render, animate = false) {
+  const previous = result.querySelector('.result-view');
+  const next = document.createElement('div'); next.className = 'result-view';
+  render(next);
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true;
+  if (!animate || !previous || reducedMotion) {
+    result.replaceChildren(next);
+    return;
+  }
+  // Keep both views in the same grid cell for the cross-fade. Only the new view
+  // remains in the accessibility tree; the outgoing layer cannot receive input.
+  previous.inert = true;
+  previous.setAttribute('aria-hidden', 'true');
+  previous.classList.add('view-exit');
+  next.classList.add('view-enter');
+  result.append(next);
+  await new Promise(resolve => setTimeout(resolve, 240));
+  previous.remove();
+  next.classList.remove('view-enter');
 }
 function button(label, action) {
   const node = document.createElement('button'); node.type = 'button'; node.className = 'retry'; node.textContent = label;
@@ -69,7 +91,7 @@ function markStale() { stale.hidden = !hasResult || formKey() === lastSubmittedK
 function fillExample(key) {
   const values = MOCK_REQUESTS[key] || MOCK_REQUESTS.success;
   for (const name of names) form.elements[name].value = values[name] ?? '';
-  clearErrors(); markStale();
+  clearErrors(); markStale(); formState.changed();
 }
 async function submit(request) {
   if (pending) return;
@@ -82,25 +104,27 @@ async function submit(request) {
     shown.language, shown.duration_hours ? `${shown.duration_hours} ч` : null].filter(Boolean).join(' · ');
   status.textContent = 'Подбираем подрядчиков.';
   result.setAttribute('aria-busy', 'true');
-  message('Подбираем подрядчиков', 'Это может занять несколько секунд.');
-  const spinner = document.createElement('div'); spinner.className = 'spinner'; spinner.setAttribute('aria-hidden', 'true'); result.prepend(spinner);
+  showResult(view => renderSkeletons(view, true));
   let invalidField;
   try {
     const data = await recommend(p, request.scenario);
-    if (data.outcome === 'matches') renderRecommendations(result, data);
-    else message(data.outcome === 'category_absent' ? 'В городе нет этой категории' : 'Нет подходящих вариантов', data.message);
+    if (data.outcome === 'matches') await showResult(view => renderRecommendations(view, data), true);
+    else await showResult(view => message(view, data.outcome === 'category_absent' ? 'В городе нет этой категории' : 'Нет подходящих вариантов', data.message), true);
     status.textContent = data.message;
   } catch (error) {
-    message('Не удалось получить подборку', error.message);
     status.textContent = error.message;
     clearErrors();
     for (const [name, text] of Object.entries(error.fieldErrors || {})) {
       if (names.includes(name)) { setError(name, text); invalidField ||= name; }
     }
-    if (!invalidField) result.append(button('Повторить', () => submit(request)));
+    await showResult(view => {
+      message(view, 'Не удалось получить подборку', error.message);
+      if (!invalidField) view.append(button('Повторить', () => submit(request)));
+    }, true);
   } finally {
     pending = false; fields.disabled = false; scenario.disabled = false;
     result.setAttribute('aria-busy', 'false'); hasResult = true;
+    formState.refresh();
     lastSubmittedKey = request.key; markStale();
     if (invalidField) form.elements[invalidField].focus();
     else document.querySelector('#results-title').focus({ preventScroll: true });
@@ -127,7 +151,8 @@ async function loadFilters() {
       return;
     }
     filterStatus.textContent = ''; fields.disabled = false; scenario.disabled = false;
-    if (MOCK_MODE) fillExample(scenario.value);
+    if (!formState.restore() && MOCK_MODE) fillExample(scenario.value);
+    formState.refresh();
   } catch (error) {
     filterStatus.textContent = error.message + ' ';
     filterStatus.append(button('Повторить загрузку', loadFilters));
@@ -139,13 +164,20 @@ form.addEventListener('submit', event => {
   submit({ payload, scenario: scenario.value, key: formKey() });
 });
 form.addEventListener('input', event => {
-  if (names.includes(event.target.name)) setError(event.target.name, '');
+  if (names.includes(event.target.name)) {
+    setError(event.target.name, '');
+    formState.changed();
+  }
   markStale();
 });
-form.addEventListener('change', markStale);
+form.addEventListener('change', event => {
+  if (names.includes(event.target.name)) formState.changed();
+  markStale();
+});
 scenario.addEventListener('change', () => { fillExample(scenario.value); markStale(); });
 form.querySelectorAll('[data-example]').forEach(node => node.addEventListener('click', () => {
   if (MOCK_MODE) scenario.value = node.dataset.example;
   fillExample(node.dataset.example);
 }));
+showResult(view => renderSkeletons(view));
 loadFilters();

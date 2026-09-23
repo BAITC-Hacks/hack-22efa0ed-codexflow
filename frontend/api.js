@@ -14,7 +14,7 @@ function validateRecommendations(data) {
       (data.outcome === 'matches') !== (data.cards.length > 0) ||
       data.cards.some(card => !plain(card) || !text(card.id) || !text(card.name) ||
         !strings(card.categories) || !text(card.city) || !Number.isFinite(card.price_from_kzt) || card.price_from_kzt < 0 ||
-        !text(card.explanation) || ['synthetic', 'price_imputed', 'city_imputed'].some(key => typeof card[key] !== 'boolean'))) {
+        !text(card.explanation) || (card.caveats != null && typeof card.caveats !== 'string') || ['synthetic', 'price_imputed', 'city_imputed'].some(key => typeof card[key] !== 'boolean'))) {
     throw new ApiError('Сервис вернул неполный ответ. Попробуйте повторить запрос.');
   }
   return data;

@@ -12,11 +12,13 @@
   <header><a class="brand" href="./">повод<span>✳</span></a><span>Ваше событие. Ваша команда.</span><a id="mode-link" href="?demo=1">Открыть демо</a></header>
   <main>
     <section class="intro"><div class="eyebrow">ПОДБОР ПОДРЯДЧИКОВ · КАЗАХСТАН</div><h1>Хорошее событие<br>начинается с людей.</h1><p>Расскажите о планах — покажем до трёх вариантов<br class="desktop"> и объясним, почему они вам подходят.</p></section>
-    <aside id="demo" hidden><strong>Демонстрационный режим</strong><p>Ответы заранее подготовлены и не зависят от изменений формы. Для настоящего подбора переключитесь на сервис.</p><label for="scenario">Сценарий</label><select id="scenario"><option value="success">Три рекомендации</option><option value="rare">Редкая категория — два варианта</option><option value="no_category">В городе нет категории</option><option value="no_match">Никто не проходит по бюджету</option><option value="error">Ошибка соединения</option></select></aside>
+    <aside id="demo" hidden><span class="demo-icon" aria-hidden="true">ⓘ</span><div class="demo-content"><strong>Демонстрационный режим</strong><p>Ответы заранее подготовлены и не зависят от изменений формы. Для настоящего подбора переключитесь на сервис.</p><label for="scenario">Сценарий</label><select id="scenario"><option value="success">Три рекомендации</option><option value="rare">Редкая категория — два варианта</option><option value="no_category">В городе нет категории</option><option value="no_match">Никто не проходит по бюджету</option><option value="error">Ошибка соединения</option></select></div></aside>
     <div class="layout">
       <form id="order-form" novalidate>
         <div class="section-title"><span class="step">01</span><h2>Ваше мероприятие</h2></div>
+        <div class="form-completion"><label id="progress-text" for="form-progress">0 из 5 заполнено</label><progress id="form-progress" max="5" value="0"></progress></div>
         <p class="hint">Обязательные поля отмечены *</p>
+        <p id="draft-status" class="draft-status" role="status"></p>
         <div id="filters-status" role="status">Загружаем параметры каталога…</div>
         <fieldset id="fields" disabled>
           <div class="examples" aria-label="Примеры запросов"><span>Попробуйте пример:</span><button type="button" data-example="success">Ведущий</button><button type="button" data-example="rare">Флорист</button><button type="button" data-example="no_match">Низкий бюджет</button></div>
@@ -28,7 +30,10 @@
             <div class="field"><label for="city">Город *</label><select id="city" name="city" required aria-describedby="city-error"></select><span class="error" id="city-error"></span></div>
             <div class="field"><label for="event_date">Дата *</label><input id="event_date" name="event_date" type="date" required aria-describedby="date-help event_date-error"><small id="date-help"></small><span class="error" id="event_date-error"></span></div>
           </div>
-          <div class="field"><label for="budget_kzt">Бюджет до, ₸ *</label><input id="budget_kzt" name="budget_kzt" type="number" min="1" step="1" placeholder="1 000 000" required aria-describedby="budget_kzt-error"><span class="error" id="budget_kzt-error"></span></div>
+          <div class="field budget-field"><div class="budget-heading"><label for="budget_kzt">Бюджет до, ₸ *</label><output id="budget-value" for="budget_kzt budget-slider">Бюджет не задан</output></div>
+            <label class="sr-only" for="budget-slider">Верхний предел бюджета, тенге</label><input id="budget-slider" type="range" min="1" max="5000000" step="1" value="1" aria-describedby="budget-help">
+            <div class="range-labels" aria-hidden="true"><span>1 ₸</span><span id="budget-slider-max">5 000 000 ₸</span></div>
+            <input id="budget_kzt" name="budget_kzt" type="number" min="1" step="1" placeholder="Введите точную сумму" required aria-describedby="budget-help budget_kzt-error"><small id="budget-help">Выберите ползунком или введите точную сумму.</small><span class="error" id="budget_kzt-error"></span></div>
           <div class="pair">
             <div class="field"><label for="duration_hours">Длительность, часов</label><input id="duration_hours" name="duration_hours" type="number" min="0.1" step="any" placeholder="Например, 4.5" aria-describedby="duration_hours-error"><span class="error" id="duration_hours-error"></span></div>
             <div class="field"><label for="language">Язык</label><select id="language" name="language" aria-describedby="language-error"></select><span class="error" id="language-error"></span></div>
