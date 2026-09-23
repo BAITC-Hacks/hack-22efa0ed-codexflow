@@ -102,7 +102,40 @@
       "HK-58236"
     ],
     "expected_eligible": 4,
-    "message_contains": "Подобрано 3 из 4"
+    "message_contains": "Подобрано 3 из 4",
+    "expected_card_categories": {
+      "HK-50695": [
+        "Банкетный зал",
+        "Ресторан"
+      ],
+      "HK-64395": [
+        "Банкетный зал",
+        "Загородная площадка",
+        "Ресторан"
+      ],
+      "HK-58236": [
+        "Банкетный зал",
+        "Загородная площадка",
+        "Ресторан"
+      ]
+    },
+    "expected_provenance": {
+      "HK-50695": {
+        "synthetic": false,
+        "city_imputed": true,
+        "price_imputed": true
+      },
+      "HK-64395": {
+        "synthetic": false,
+        "city_imputed": true,
+        "price_imputed": true
+      },
+      "HK-58236": {
+        "synthetic": false,
+        "city_imputed": true,
+        "price_imputed": true
+      }
+    }
   },
   {
     "name": "Нулевой бюджет: ошибка поля, не падение сервера",
