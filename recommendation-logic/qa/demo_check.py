@@ -38,6 +38,12 @@ def check_case(case, status, body):
             raise AssertionError('Missing dated card explanation')
         if any(type(card.get(flag)) is not bool for flag in ('synthetic', 'city_imputed', 'price_imputed')):
             raise AssertionError('Missing data provenance flags')
+        expected_categories = case.get('expected_card_categories', {}).get(card['id'])
+        if expected_categories is not None and card.get('categories') != expected_categories:
+            raise AssertionError(f"Unexpected categories for {card['id']}")
+        expected_flags = case.get('expected_provenance', {}).get(card['id'], {})
+        if any(card.get(flag) is not value for flag, value in expected_flags.items()):
+            raise AssertionError(f"Unexpected provenance flags for {card['id']}")
 
 
 def main():
