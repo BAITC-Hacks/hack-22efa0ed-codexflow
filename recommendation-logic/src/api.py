@@ -1,13 +1,20 @@
 """HTTP API for the deterministic contractor recommendation engine."""
 
 from pathlib import Path
+import sys
 from typing import Literal
 
 from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from contractor_assistant.chat import assistant_turn
 from src.ai_explanations import get_explainer
 
 from src.recommendation import (
@@ -85,6 +92,62 @@ class RecommendationResponse(BaseModel):
     cards: list[RecommendationCard] = Field(max_length=3)
     message: str
     stats: RecommendationStats
+
+
+class AssistantContext(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    city: str | None = None
+    event_date: str | None = None
+    event_format: str | None = None
+    category: str | None = None
+    budget_kzt: int | None = None
+    duration_hours: int | float | None = None
+    language: str | None = None
+
+
+class AssistantChatPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    message: str = Field(max_length=2000)
+    context: AssistantContext = Field(default_factory=AssistantContext)
+
+
+class AssistantChatResponse(BaseModel):
+    reply: str
+    context: AssistantContext
+    complete: bool
+    recommendation: RecommendationResponse | None = None
+
+
+@app.post("/assistant/chat", response_model=AssistantChatResponse)
+async def assistant_chat(payload: AssistantChatPayload) -> dict:
+    """Parse a chat turn, request missing details, and reuse the catalog matcher."""
+    turn = assistant_turn(PROVIDERS, payload.message, payload.context.model_dump())
+    result = turn.get("recommendation")
+    if turn.get("complete") and result:
+        context = turn["context"]
+        request = RecommendationRequest(
+            city=context["city"], event_date=context["event_date"],
+            event_format=context["event_format"], category=context["category"],
+            budget_kzt=context["budget_kzt"], duration_hours=context.get("duration_hours"),
+            language=context.get("language"),
+        )
+        result, _, _ = await get_explainer().enhance(result, PROVIDERS, request)
+        turn["recommendation"] = result
+    return turn
+
+
+@app.get("/assistant-assets/widget.js", include_in_schema=False)
+def assistant_widget_js():
+    return FileResponse(REPOSITORY_ROOT / "contractor_assistant" / "widget.js",
+                        media_type="application/javascript")
+
+
+@app.get("/assistant-assets/widget.css", include_in_schema=False)
+def assistant_widget_css():
+    return FileResponse(REPOSITORY_ROOT / "contractor_assistant" / "widget.css",
+                        media_type="text/css")
 
 
 @app.get("/health")
