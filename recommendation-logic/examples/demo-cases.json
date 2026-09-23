@@ -1,42 +1,119 @@
 [
   {
     "name": "Ведущие: три варианта из четырёх",
-    "request": {"city": "Алматы", "event_date": "2026-10-07", "event_format": "свадьба", "category": "Ведущий", "budget_kzt": 1000000, "language": "казахский"},
-    "expected_status": 200, "expected_outcome": "matches",
-    "expected_ids": ["HK-35215", "HK-42352", "HK-27222"], "expected_eligible": 4,
+    "request": {
+      "city": "Алматы",
+      "event_date": "2026-10-07",
+      "event_format": "свадьба",
+      "category": "Ведущий",
+      "budget_kzt": 1000000,
+      "language": "казахский"
+    },
+    "expected_status": 200,
+    "expected_outcome": "matches",
+    "expected_ids": [
+      "HK-35215",
+      "HK-42352",
+      "HK-27222"
+    ],
+    "expected_eligible": 4,
     "message_contains": "Подобрано 3 из 4"
   },
   {
     "name": "Те же условия, другая дата: ведущие заняты",
-    "request": {"city": "Алматы", "event_date": "2026-10-03", "event_format": "свадьба", "category": "Ведущий", "budget_kzt": 1000000, "language": "казахский"},
-    "expected_status": 200, "expected_outcome": "no_match",
-    "expected_ids": [], "expected_eligible": 0,
+    "request": {
+      "city": "Алматы",
+      "event_date": "2026-10-03",
+      "event_format": "свадьба",
+      "category": "Ведущий",
+      "budget_kzt": 1000000,
+      "language": "казахский"
+    },
+    "expected_status": 200,
+    "expected_outcome": "no_match",
+    "expected_ids": [],
+    "expected_eligible": 0,
     "message_contains": "4 профиля, но все они заняты на 2026-10-03"
   },
   {
     "name": "Редкая категория: два флориста",
-    "request": {"city": "Алматы", "event_date": "2026-10-04", "event_format": "свадьба", "category": "Флорист", "budget_kzt": 250000, "language": "русский"},
-    "expected_status": 200, "expected_outcome": "matches",
-    "expected_ids": ["HK-39372", "HK-90001"], "expected_eligible": 2,
+    "request": {
+      "city": "Алматы",
+      "event_date": "2026-10-04",
+      "event_format": "свадьба",
+      "category": "Флорист",
+      "budget_kzt": 250000,
+      "language": "русский"
+    },
+    "expected_status": 200,
+    "expected_outcome": "matches",
+    "expected_ids": [
+      "HK-39372",
+      "HK-90001"
+    ],
+    "expected_eligible": 2,
     "message_contains": "Меньше трёх"
   },
   {
     "name": "Нет результатов: не хватает бюджета",
-    "request": {"city": "Алматы", "event_date": "2026-10-04", "event_format": "свадьба", "category": "Флорист", "budget_kzt": 100000, "language": "русский"},
-    "expected_status": 200, "expected_outcome": "no_match",
-    "expected_ids": [], "expected_eligible": 0,
+    "request": {
+      "city": "Алматы",
+      "event_date": "2026-10-04",
+      "event_format": "свадьба",
+      "category": "Флорист",
+      "budget_kzt": 100000,
+      "language": "русский"
+    },
+    "expected_status": 200,
+    "expected_outcome": "no_match",
+    "expected_ids": [],
+    "expected_eligible": 0,
     "message_contains": "цена от 200 000 ₸ выше бюджета 100 000 ₸"
   },
   {
     "name": "В городе нет выбранной категории",
-    "request": {"city": "Зарубежье", "event_date": "2026-10-04", "event_format": "свадьба", "category": "Флорист", "budget_kzt": 250000},
-    "expected_status": 200, "expected_outcome": "category_absent",
-    "expected_ids": [], "expected_eligible": 0,
+    "request": {
+      "city": "Зарубежье",
+      "event_date": "2026-10-04",
+      "event_format": "свадьба",
+      "category": "Флорист",
+      "budget_kzt": 250000
+    },
+    "expected_status": 200,
+    "expected_outcome": "category_absent",
+    "expected_ids": [],
+    "expected_eligible": 0,
     "message_contains": "нет подрядчиков категории"
   },
   {
+    "name": "Площадки: несколько категорий и метки города/цены",
+    "request": {
+      "city": "Алматы",
+      "event_date": "2026-10-08",
+      "event_format": "свадьба",
+      "category": "Банкетный зал",
+      "budget_kzt": 3500000
+    },
+    "expected_status": 200,
+    "expected_outcome": "matches",
+    "expected_ids": [
+      "HK-50695",
+      "HK-64395",
+      "HK-58236"
+    ],
+    "expected_eligible": 4,
+    "message_contains": "Подобрано 3 из 4"
+  },
+  {
     "name": "Нулевой бюджет: ошибка поля, не падение сервера",
-    "request": {"city": "Алматы", "event_date": "2026-10-07", "event_format": "свадьба", "category": "Ведущий", "budget_kzt": 0},
-    "expected_status": 422, "expected_error_field": "budget_kzt"
+    "request": {
+      "city": "Алматы",
+      "event_date": "2026-10-07",
+      "event_format": "свадьба",
+      "category": "Ведущий",
+      "budget_kzt": 0
+    },
+    "expected_status": 422,
+    "expected_error_field": "budget_kzt"
   }
 ]
